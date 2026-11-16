@@ -3,3 +3,4 @@
 /.logs/
 /.wrangler/
 node_modules/
+/artifacts/
