@@ -1,18 +1,12 @@
 {
-  "name": "top-down-fc",
+  "name": "ultimate-football-27",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Top-Down FC — a 3D top-down football game with full mobile-style controls",
+  "description": "Ultimate Football 27 — 3D top-down football with kick off, career, tournaments, clubs and training",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "three": "^0.169.0"
-  },
-  "devDependencies": {
-    "vite": "^5.4.10"
+    "dev": "node serve.js",
+    "start": "node serve.js",
+    "verify": "node serve.js --verify"
   }
 }

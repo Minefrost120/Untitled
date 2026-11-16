@@ -4,14 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#050d0b" />
-    <title>Top-Down FC — 3D Football</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23081510'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='26' font-weight='bold' fill='%23c6ff45' text-anchor='middle'%3EFC%3C/text%3E%3C/svg%3E"
+    />
+    <title>Ultimate Football 27</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/src/style.css" />
+    <script type="module" crossorigin src="/assets/index-CPu46q6F.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/preload-helper-CLcXU_4U.js">
+    <link rel="modulepreload" crossorigin href="/assets/clubs-7SsSOggh.js">
+    <link rel="modulepreload" crossorigin href="/assets/sharedSquads-BOOy-0mA.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-TI-_EKr0.css">
   </head>
   <body>
     <div id="app">
@@ -71,96 +79,388 @@
           <button class="abtn pass" data-act="pass"><span>PASS</span><small>J</small></button>
           <button class="abtn sprint" data-act="sprint"><span>SPRINT</span><small>SHIFT</small></button>
           <button class="abtn shoot" data-act="shoot"><span>SHOOT</span><small>SPACE</small></button>
+          <button class="abtn second" data-act="second"><span>SECOND</span><small>F</small></button>
+        </div>
+
+        <div id="playerActions" class="player-actions hidden" aria-label="Player career actions">
+          <button class="abtn player-action primary" data-act="career-primary">
+            <span id="careerActionLabel">CALL FOR BALL</span>
+            <small id="careerActionHint">ASK FOR THE PASS</small>
+          </button>
+          <button class="abtn player-action shoot" data-act="career-shoot">
+            <span>SHOOT</span>
+            <small>SPACE · TAP</small>
+          </button>
+          <button class="abtn player-action skill" data-act="career-skill">
+            <span>SKILL</span>
+            <small>L</small>
+          </button>
+          <button class="abtn player-action run" data-act="career-run">
+            <span>RUN</span>
+            <small>HOLD · SPRINT</small>
+          </button>
+        </div>
+
+        <div id="matchRoleChip" class="match-role-chip hidden" aria-live="polite"></div>
+
+        <div id="matchSquadBrief" class="match-squad-brief hidden" role="dialog" aria-modal="true" aria-labelledby="squadBriefTitle">
+          <div class="squad-sheet">
+            <div class="squad-sheet-top"><span>MATCHDAY SQUAD</span><small id="squadBriefMeta"></small></div>
+            <h2 id="squadBriefTitle">TEAM SHEET</h2>
+            <div class="squad-sheet-role" id="squadBriefRole"></div>
+            <div class="squad-sheet-cols">
+              <section><h3>STARTING XI</h3><ol id="squadBriefStarters"></ol></section>
+              <section><h3>SUBSTITUTES</h3><ol id="squadBriefBench"></ol></section>
+            </div>
+            <button id="squadBriefContinue" class="btn btn-primary" type="button">KICK OFF</button>
+          </div>
         </div>
 
         <div id="banner" class="banner"></div>
-      </div>
-
-      <!-- ══════════════════ MAIN MENU ══════════════════ -->
-      <div id="menu" class="screen menu">
-        <div class="menu-bg"></div>
-        <div class="menu-wrap">
-          <header class="hero">
-            <div class="kicker"><i></i>3D TOP-DOWN FOOTBALL<i></i></div>
-            <h1>TOP<span>DOWN</span><em>FC</em></h1>
-            <p class="sub">Eleven a side. Ninety minutes. Every control in your hands.</p>
-          </header>
-
-          <div class="menu-grid">
-            <section class="panel">
-              <div class="panel-head">
-                <h2>Choose your club</h2>
-                <span class="hint">TAP A CREST</span>
-              </div>
-              <div id="teamGrid" class="team-grid"></div>
-            </section>
-
-            <section class="panel setup">
-              <div class="panel-head"><h2>Match setup</h2></div>
-
-              <button id="opponentCard" class="opponent" title="Tap to change opponent">
-                <div class="vs">VS</div>
-                <div class="opponent-body">
-                  <div class="opponent-label">OPPONENT</div>
-                  <div class="opponent-name" id="oppName">Azure City</div>
-                  <div class="opponent-rating" id="oppRating">OVR 86</div>
-                </div>
-                <div class="crest small" id="oppCrest">AZC</div>
-                <div class="swap">⇄</div>
-              </button>
-
-              <div class="optblock">
-                <label>DIFFICULTY</label>
-                <div class="seg" id="diffSeg">
-                  <button data-val="easy">EASY</button>
-                  <button data-val="normal" class="active">NORMAL</button>
-                  <button data-val="hard">PRO</button>
-                </div>
-              </div>
-
-              <div class="optblock">
-                <label>HALF LENGTH</label>
-                <div class="seg" id="halfSeg">
-                  <button data-val="120">2 MIN</button>
-                  <button data-val="180" class="active">3 MIN</button>
-                  <button data-val="300">5 MIN</button>
-                </div>
-              </div>
-
-              <button id="kickOff" class="cta">
-                <span>KICK OFF</span>
-                <small>FULL 11 v 11</small>
-              </button>
-            </section>
-          </div>
-
-          <div class="controls-grid">
-            <div><b>MOVE</b><span>WASD / ARROWS / STICK</span></div>
-            <div><b>PASS</b><span>J</span></div>
-            <div><b>THROUGH BALL</b><span>K</span></div>
-            <div><b>SHOOT</b><span>SPACE · HOLD FOR POWER</span></div>
-            <div><b>SPRINT</b><span>SHIFT</span></div>
-            <div><b>SKILL MOVE</b><span>L</span></div>
-            <div><b>TACKLE</b><span>E · HOLD TO SLIDE</span></div>
-            <div><b>SWITCH PLAYER</b><span>Q</span></div>
-            <div><b>PAUSE</b><span>ESC / P</span></div>
-            <div><b>SOUND</b><span>M</span></div>
-          </div>
-
-          <div class="footnote">Flip phone sideways for the full handheld experience.</div>
+        <div id="hintBar" class="hint-bar"></div>
+        <div id="eventFeed" class="event-feed"></div>
+        <div id="replayBadge" class="replay-badge hidden">
+          <span>GOAL REPLAY</span>
+          <button id="skipReplay" type="button">SKIP</button>
         </div>
       </div>
 
-      <!-- ══════════════════ PAUSE ══════════════════ -->
-      <div id="pause" class="screen modal hidden">
-        <div class="modal-card">
-          <div class="kicker"><i></i>PAUSED<i></i></div>
-          <h2>Take a breather</h2>
+      <!-- Engine-driven set-piece overlays. The 3D game owns the interaction;
+           this shell only supplies the control surfaces it reads. -->
+      <div id="restartUI" class="restart-ui hidden">
+        <div class="restart-card">
+          <div class="restart-kicker" id="restartKicker">RESTART</div>
+          <h2 id="restartTitle">SET PIECE</h2>
+          <p id="restartPrompt">Choose a delivery.</p>
+          <div id="restartTargets" class="restart-targets"></div>
+          <div class="restart-choices">
+            <button id="restartShort" type="button">SHORT</button>
+            <button id="restartLong" type="button">LONG</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="keeperUI" class="keeper-ui hidden">
+        <div class="keeper-card">
+          <div class="keeper-kicker" id="keeperKicker">GOALKEEPER · P1</div>
+          <div class="keeper-title">READ THE SHOT</div>
+          <div id="keeperGoal" class="keeper-goal" aria-label="tap a goal zone to predict the shot">
+            <button class="keeper-zone" type="button" data-zone="0" aria-label="top left"></button>
+            <button class="keeper-zone" type="button" data-zone="1" aria-label="top centre"></button>
+            <button class="keeper-zone" type="button" data-zone="2" aria-label="top right"></button>
+            <button class="keeper-zone" type="button" data-zone="3" aria-label="middle left"></button>
+            <button class="keeper-zone" type="button" data-zone="4" aria-label="middle centre"></button>
+            <button class="keeper-zone" type="button" data-zone="5" aria-label="middle right"></button>
+            <button class="keeper-zone" type="button" data-zone="6" aria-label="bottom left"></button>
+            <button class="keeper-zone" type="button" data-zone="7" aria-label="bottom centre"></button>
+            <button class="keeper-zone" type="button" data-zone="8" aria-label="bottom right"></button>
+          </div>
+          <div id="keeperPick" class="keeper-pick">TAP A ZONE BEFORE THE SHOT</div>
+          <div class="keeper-timer"><i id="keeperTimer"></i></div>
+        </div>
+      </div>
+
+      <div id="corner" class="corner-ui hidden">
+        <div class="cn-top">
+          <span class="cn-kicker">CORNER</span>
+          <b id="cnTitle">RIVERTON FC</b>
+          <span class="cn-status" id="cnStatus">PLAYERS INTO THE BOX</span>
+          <button class="cn-pause" id="cnPause" aria-label="Pause" type="button">☰</button>
+        </div>
+        <div class="cn-chips">
+          <div class="cn-chiprow" id="cnDeliveries">
+            <button data-delivery="inswing" class="active" type="button">INSWING</button>
+            <button data-delivery="outswing" type="button">OUTSWING</button>
+            <button data-delivery="driven" type="button">DRIVEN</button>
+            <button data-delivery="loop" type="button">HIGH</button>
+            <button data-delivery="low" type="button">LOW</button>
+            <button data-delivery="short" type="button">SHORT</button>
+          </div>
+          <div class="cn-chiprow tactics" id="cnTactics">
+            <button data-tactic="near" class="active" type="button">NEAR POST</button>
+            <button data-tactic="far" type="button">FAR POST</button>
+            <button data-tactic="centre" type="button">CENTRE</button>
+            <button data-tactic="edge" type="button">EDGE OF BOX</button>
+            <button data-tactic="crowd" type="button">CROWD</button>
+            <button data-tactic="short" type="button">SHORT</button>
+          </div>
+        </div>
+        <div class="cn-swipe" id="cnSwipe" aria-label="Swipe to cross">
+          <div class="cn-guide" id="cnGuide">
+            <span class="cn-guide-icon">↗</span>
+            <b>SWIPE TO CROSS</b>
+            <span>DISTANCE = POWER · ANGLE = DIRECTION · CURVE THE SWIPE</span>
+          </div>
+        </div>
+        <div class="cn-readout" id="cnReadout">
+          <div class="cn-read-head">
+            <span id="cnAimLabel">NEAR POST</span>
+            <b id="cnDeliveryLabel">NEAR POST · INSWING</b>
+          </div>
+          <div class="cn-meters">
+            <div class="cn-meter"><span>POWER</span><div class="cn-track"><i id="cnPowerBar"></i></div><em id="cnPowerVal">66%</em></div>
+            <div class="cn-meter"><span>CURVE</span><div class="cn-track"><i id="cnCurveBar"></i></div><em id="cnCurveVal">STRAIGHT</em></div>
+            <div class="cn-meter"><span>HEIGHT</span><div class="cn-track"><i id="cnHeightBar"></i></div><em id="cnHeightVal">2.1m</em></div>
+          </div>
+        </div>
+        <div class="cn-actions" id="cnActions">
+          <button id="cnCancel" class="cn-ghost hidden" type="button">CANCEL AIM</button>
+          <button id="cnCross" class="cn-cta hidden" type="button">CROSS IT</button>
+          <button id="cnTake" class="cn-cta" type="button">TAKE CORNER</button>
+        </div>
+      </div>
+
+      <div id="refUI" class="ref-ui hidden" aria-live="polite">
+        <div class="ref-card">
+          <div class="ref-kicker" id="refPhase">INCIDENT</div>
+          <button id="refSkip" class="ref-skip hidden" type="button">SKIP ▶</button>
+          <div id="refDecision" class="ref-decision hidden">
+            <span id="refDecisionIcon">●</span>
+            <div>
+              <b id="refDecisionTitle">FREE KICK</b>
+              <span id="refDecisionSub">RIVERTON</span>
+            </div>
+          </div>
+          <div id="refCardPop" class="ref-card-pop hidden">
+            <i id="refCardSwatch" class="ref-card-swatch yellow"></i>
+            <div>
+              <b id="refCardTitle">YELLOW CARD</b>
+              <span id="refCardName">PLAYER · #10</span>
+            </div>
+          </div>
+          <div id="refVar" class="ref-var hidden">
+            <div><span>VAR</span><b id="refVarText">CHECKING PENALTY</b></div>
+            <em id="refVarResult"></em>
+          </div>
+          <div id="refAdvantage" class="ref-advantage hidden">
+            <b>ADVANTAGE</b>
+            <span id="refAdvantageText">PLAY ON</span>
+          </div>
+          <div id="refReplay" class="ref-replay hidden">
+            <span>REF CAM · REPLAY</span>
+            <b id="refReplayAngle">BROADCAST</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════ FC 27 HOME ══════════════════ -->
+      <div id="home" class="screen uf-home"></div>
+
+      <div id="teamSelect" class="screen ts-screen hidden"></div>
+
+      <!-- ══════════════════ UF27 MODE SCREENS ══════════════════ -->
+      <div id="manager" class="screen manager-screen hidden"></div>
+      <div id="cup" class="screen cup-screen hidden"></div>
+      <div id="training" class="screen training-screen hidden"></div>
+
+      <div id="menu" class="screen kc-screen"></div>
+
+      <!-- ══════════════════ PLAYER CAREER (PHASE 2 PRESENTATION) ══════════════════ -->
+      <div id="career" class="screen career-screen hidden">
+        <div class="career-bg" aria-hidden="true"></div>
+        <div class="career-shell">
+          <header class="career-header">
+            <div class="career-header-left">
+              <button id="careerBack" class="career-back" type="button" data-action="close" aria-label="Back to main menu">←</button>
+              <div class="career-brand">
+                <span class="career-brand-kicker">FC 27</span>
+                <strong>PLAYER CAREER</strong>
+              </div>
+            </div>
+            <div class="career-header-mid"><span id="careerHeaderSub">CAREER DATA</span></div>
+            <div class="career-header-right">
+              <span id="careerStorageChip" class="mini-chip">STORAGE</span>
+              <span id="careerStatusChip" class="mini-chip">NOT LOADED</span>
+              <span class="phase-chip">PLAYER CAREER</span>
+            </div>
+          </header>
+
+          <main class="career-body">
+            <div id="careerWarnings" class="career-alerts" aria-live="polite"></div>
+            <section id="careerSlots" class="career-view"></section>
+            <section id="careerHub" class="career-view hidden"></section>
+          </main>
+
+          <footer class="career-footer">
+            <span>PLAYER CAREER DATA · LOCAL DEVICE STORAGE</span>
+            <span>PLAYER CAREER · SEASON 2026/27</span>
+          </footer>
+        </div>
+
+        <div id="careerToast" class="career-toast" role="status" aria-live="polite"></div>
+
+                <div id="createCareerModal" class="career-modal creator-modal hidden" aria-hidden="true">
+          <div class="career-modal-card career-creator-card" role="dialog" aria-modal="true" aria-label="Create your player">
+            <div id="playerCreator"></div>
+          </div>
+        </div>
+
+
+        <div id="renamePlayerModal" class="career-modal hidden" aria-hidden="true">
+          <div class="career-modal-card" role="dialog" aria-modal="true" aria-labelledby="renamePlayerTitle">
+            <button class="career-modal-x" type="button" data-close="rename" aria-label="Close">×</button>
+            <div class="eyebrow">PLAYER IDENTITY</div>
+            <h3 id="renamePlayerTitle">Edit player profile</h3>
+            <p class="career-modal-sub">Names are written straight into the career save file.</p>
+            <form id="renamePlayerForm" novalidate>
+              <div class="form-grid">
+                <label class="field">
+                  <span>FIRST NAME</span>
+                  <input id="renameFirstName" maxlength="24" autocomplete="off" required />
+                </label>
+                <label class="field">
+                  <span>LAST NAME</span>
+                  <input id="renameLastName" maxlength="24" autocomplete="off" required />
+                </label>
+                <label class="field field-wide">
+                  <span>KNOWN AS</span>
+                  <input id="renameKnownAs" maxlength="24" autocomplete="off" placeholder="Leave empty to use last name" />
+                </label>
+              </div>
+              <div id="renamePlayerError" class="form-error" role="alert"></div>
+              <div class="career-modal-actions">
+                <button class="btn btn-primary" type="submit">SAVE PLAYER</button>
+                <button class="btn" type="button" data-close="rename">CANCEL</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      <div id="matchReportModal" class="career-modal hidden" aria-hidden="true">
+        <div class="career-modal-card match-report-modal" role="dialog" aria-modal="true" aria-labelledby="matchReportTitle">
+          <button class="career-modal-x" type="button" data-close="match-report" aria-label="Close match report">×</button>
+          <div class="eyebrow">ARCHIVED MATCH REPORT</div>
+          <h3 id="matchReportTitle">Match report</h3>
+          <div id="matchReportBody"></div>
+          <div class="career-modal-actions">
+            <button class="btn" type="button" data-close="match-report">CLOSE REPORT</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="contractModal" class="career-modal hidden" aria-hidden="true">
+        <div class="career-modal-card contract-modal-card" role="dialog" aria-modal="true" aria-labelledby="contractModalTitle">
+          <button class="career-modal-x" type="button" data-close="contract" aria-label="Close contract talks">×</button>
+          <div class="eyebrow">CONTRACT TALKS</div>
+          <h3 id="contractModalTitle">Renewal offer</h3>
+          <div id="contractModalBody"></div>
+          <div id="contractModalActions" class="career-modal-actions"></div>
+        </div>
+      </div>
+
+      <div id="transferModal" class="career-modal hidden" aria-hidden="true">
+        <div class="career-modal-card transfer-modal-card" role="dialog" aria-modal="true" aria-labelledby="transferModalTitle">
+          <button class="career-modal-x" type="button" data-close="transfer" aria-label="Close transfer offer">×</button>
+          <div class="eyebrow">TRANSFER OFFER</div>
+          <h3 id="transferModalTitle">Club interest</h3>
+          <div id="transferModalBody"></div>
+          <div id="transferModalActions" class="career-modal-actions"></div>
+        </div>
+      </div>
+
+      <div id="mediaModal" class="career-modal hidden" aria-hidden="true">
+        <div class="career-modal-card media-modal-card" role="dialog" aria-modal="true" aria-labelledby="mediaModalTitle">
+          <button class="career-modal-x" type="button" data-close="media" aria-label="Close press conference">×</button>
+          <div class="eyebrow">MEDIA DESK</div>
+          <h3 id="mediaModalTitle">Post-match press conference</h3>
+          <div id="mediaModalBody"></div>
+          <div id="mediaModalActions" class="career-modal-actions"></div>
+        </div>
+      </div>
+      </div>
+
+      <!-- ══════════════════ BENCH · SIMULATED MATCH STATS ══════════════════ -->
+      <div id="benchSim" class="bench-sim hidden" role="dialog" aria-modal="true" aria-labelledby="benchTitle">
+        <div class="bench-card">
+          <div class="bench-top">
+            <span class="bench-kicker" id="benchKicker">ON THE BENCH</span>
+            <b id="benchMinute">0'</b>
+          </div>
+          <h2 id="benchTitle">MATCH STATS</h2>
+          <div class="bench-scoreline" id="benchScore">RIV 0 – 0 AZC</div>
+          <p class="bench-status" id="benchStatus">The match is being simulated until the manager calls you on.</p>
+          <div class="bench-stats" id="benchStats"></div>
+          <div class="bench-events" id="benchEvents"></div>
+          <button id="benchContinue" class="bench-continue hidden" type="button">TAKE THE FIELD</button>
+        </div>
+      </div>
+
+      <!-- ══════════════════ PAUSE / MATCH CONTROL ══════════════════ -->
+      <div id="pause" class="screen modal hidden" aria-hidden="true">
+        <div class="modal-card pause-card">
+          <div class="panel-head">
+            <div class="kicker">PAUSED</div>
+            <button class="xbtn" id="resumeX" type="button" aria-label="Resume match">✕</button>
+          </div>
+          <h2>Match control</h2>
           <p class="modal-sub" id="pauseScore">RIVERTON 0 – 0 AZURE CITY</p>
-          <div class="modal-actions">
-            <button class="cta" id="resumeBtn"><span>RESUME</span></button>
-            <button class="ghost" id="restartBtn">RESTART MATCH</button>
-            <button class="ghost" id="quitBtn">CHANGE CLUB</button>
+          <div class="pause-grid">
+            <div class="pause-section">
+              <label>CAMERA</label>
+              <div class="seg wrap" id="pauseCamera"></div>
+            </div>
+            <div class="pause-section">
+              <label>MATCH SPEED</label>
+              <div class="seg" id="pauseSpeed"></div>
+            </div>
+            <div class="pause-section tactics-only">
+              <label>MENTALITY</label>
+              <div class="seg" id="mentalitySeg">
+                <button type="button" data-val="defend">DEFEND</button>
+                <button type="button" data-val="balanced" class="active">BALANCED</button>
+                <button type="button" data-val="attack">ATTACK</button>
+              </div>
+            </div>
+            <div class="pause-section tactics-only">
+              <label>PRESSING</label>
+              <div class="seg" id="pressingSeg">
+                <button type="button" data-val="low">LOW</button>
+                <button type="button" data-val="mid" class="active">MID</button>
+                <button type="button" data-val="high">HIGH</button>
+              </div>
+            </div>
+            <div class="pause-section tactics-only">
+              <label>PLAYSTYLE</label>
+              <select class="tactic-select" id="pauseStyle"></select>
+            </div>
+            <div class="pause-section tactics-only full">
+              <label>SHAPE</label>
+              <div class="seg" id="pauseFormation"></div>
+            </div>
+            <div class="pause-section subs-only full">
+              <label>SUBSTITUTIONS <span id="subsInfo">0/5</span></label>
+              <div class="subs-cols">
+                <div class="squad-col">
+                  <div class="squad-head"><span>ON PITCH</span><b>OVR</b></div>
+                  <div id="pauseStarters" class="subs-list"></div>
+                </div>
+                <div class="squad-col">
+                  <div class="squad-head"><span>BENCH</span><b>OVR</b></div>
+                  <div id="pauseBench" class="subs-list"></div>
+                </div>
+              </div>
+              <p class="pause-note" id="pauseNote">Pick a player on the pitch, then a substitute.</p>
+            </div>
+            <div class="pause-section">
+              <label>AUDIO</label>
+              <div class="sliders">
+                <label>MASTER <input id="volMaster" type="range" min="0" max="1" step="0.01" /></label>
+                <label>CROWD <input id="volCrowd" type="range" min="0" max="1" step="0.01" /></label>
+                <label>EFFECTS <input id="volEffects" type="range" min="0" max="1" step="0.01" /></label>
+              </div>
+            </div>
+            <div class="pause-section">
+              <label>CONTROLS</label>
+              <div class="sliders">
+                <label>STICK SENSITIVITY <input id="stickSens" type="range" min="0.5" max="1.4" step="0.05" /></label>
+                <label>BUTTON SIZE <input id="buttonSize" type="range" min="0.7" max="1.25" step="0.05" /></label>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions row">
+            <button class="cta" id="resumeBtn" type="button">RESUME</button>
+            <button class="ghost" id="restartBtn" type="button">RESTART MATCH</button>
+            <button class="ghost" id="quitBtn" type="button">QUIT</button>
           </div>
         </div>
       </div>
@@ -169,24 +469,40 @@
       <div id="result" class="screen modal hidden">
         <div class="modal-card result-card">
           <div class="kicker"><i></i>FULL TIME<i></i></div>
+          <div class="result-verdict" id="resOutcome">RESULT</div>
           <div class="final-score">
             <div class="fs-team"><div class="crest" id="resCrestHome">RIV</div><span id="resNameHome">RIVERTON</span></div>
             <div class="fs-num" id="resScore">0 – 0</div>
             <div class="fs-team"><div class="crest" id="resCrestAway">AZC</div><span id="resNameAway">AZURE</span></div>
           </div>
-          <div class="result-stats">
-            <div><span>POSSESSION</span><b id="resPoss">50% – 50%</b></div>
-            <div><span>SHOTS</span><b id="resShots">0 – 0</b></div>
-            <div><span>ON TARGET</span><b id="resOnTarget">0 – 0</b></div>
+          <div class="match-report" aria-label="Match statistics">
+            <div class="match-report-head">
+              <div class="report-team home"><i class="report-swatch"></i><b id="resReportHome">HOME</b></div>
+              <span>TEAM STATS</span>
+              <div class="report-team away"><b id="resReportAway">AWAY</b><i class="report-swatch"></i></div>
+            </div>
+            <div class="report-rows" id="resReportRows"></div>
           </div>
-          <div class="modal-actions">
+          <div id="careerResultSummary" class="career-result-summary hidden">
+            <div class="career-result-context" id="resCareerContext">PLAYER CAREER</div>
+            <div class="career-result-grid">
+              <div><span>YOUR RATING</span><b id="resPlayerRating">—</b></div>
+              <div><span>GOALS</span><b id="resPlayerGoals">0</b></div>
+              <div><span>ASSISTS</span><b id="resPlayerAssists">0</b></div>
+              <div><span>MATCH XP</span><b id="resPlayerXp">0</b></div>
+            </div>
+            <p class="career-result-note" id="resCareerNote"></p>
+          </div>
+          <div id="quickResultActions" class="modal-actions">
             <button class="cta" id="rematchBtn"><span>REMATCH</span></button>
-            <button class="ghost" id="menuBtn">CHANGE CLUB</button>
+            <button class="ghost" id="menuBtn">MAIN MENU</button>
+          </div>
+          <div id="careerResultActions" class="modal-actions hidden">
+            <button class="cta" id="careerContinueBtn"><span>RETURN TO CAREER</span></button>
           </div>
         </div>
       </div>
     </div>
 
-    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
