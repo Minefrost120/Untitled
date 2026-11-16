@@ -7,6 +7,6 @@
   "scripts": {
     "dev": "node serve.js",
     "start": "node serve.js",
-    "verify": "node serve.js --verify"
+    "dev:worker": "wrangler dev --config wrangler.jsonc --port 8787"
   }
 }

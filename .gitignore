@@ -1,3 +1,5 @@
 /freebuff-sites-build/
 /logs/
 /.logs/
+/.wrangler/
+node_modules/
