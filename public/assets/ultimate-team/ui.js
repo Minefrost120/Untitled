@@ -26,6 +26,16 @@ const touchSwap = (() => {
   }
 })();
 
+const DUEL_KEY = 'uf27:duel:v1';
+const loadDuel = () => {
+  try {
+    const raw = localStorage.getItem(DUEL_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const difficultyStars = (rating) => {
   const filled = rating >= 86 ? 5 : rating >= 80 ? 4 : 3;
   return '\u2605'.repeat(filled) + '\u2606'.repeat(5 - filled);
@@ -45,6 +55,7 @@ const TAB_ICONS = {
   rivals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 6 7 6-7"/><path d="m6 13 6 7 6-7"/></svg>`,
   objectives: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
   career: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/><path d="m17 3 1.6 3.4L22 7l-3.4 1.6L17 12l-1.6-3.4L12 7l3.4-.6L17 3Z"/></svg>`,
+  duel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="7" height="14" rx="1.6"/><rect x="14" y="5" width="7" height="14" rx="1.6"/><path d="M10 12h4"/></svg>`,
 };
 
   function playerCard(player, options = {}) {
@@ -86,6 +97,11 @@ export function mountUltimateTeam({ data }) {
   let careerState = career.loadCareer();
   let careerClubs = null;
   const careerForm = { name: '', pos: 'ST', leagueId: '', clubId: '' };
+  let duelRoom = loadDuel();
+  let duelBusy = false;
+  let duelError = '';
+  let duelTimer = null;
+  let duelPolling = false;
   let marketQuery = '';
   let marketPos = 'ALL';
   let marketLeague = 'ALL';
@@ -222,6 +238,7 @@ export function mountUltimateTeam({ data }) {
             ['store', 'STORE', 'PACKS'],
             ['market', 'MARKET', 'BUY'],
             ['battles', 'BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
+            ['duel', '1V1', duelRoom ? (duelRoom.result ? 'RESULT' : 'WAITING') : 'ONLINE'],
             ['rivals', 'RIVALS', rivalRank],
             ['club', 'CLUB', `${state.club.length}`],
             ['career', 'CAREER', careerState ? (careerState.manager ? 'MANAGER' : `SEASON ${careerState.season}`) : 'NEW PRO'],
@@ -247,6 +264,8 @@ export function mountUltimateTeam({ data }) {
                   ? marketView()
                 : tab === 'battles'
                   ? battlesView()
+                  : tab === 'duel'
+                    ? duelView()
                   : tab === 'rivals'
                     ? rivalsView()
                     : tab === 'career'
@@ -468,6 +487,7 @@ export function mountUltimateTeam({ data }) {
       modeTile('store', 'STORE', `${store.PACKS.length} packs · ${coins(state.coins)} coins`, 'store'),
       modeTile('market', 'MARKET', `${data.pool.length.toLocaleString('en-GB')} players to sign`, 'market'),
       modeTile('battles', 'SQUAD BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L · ${state.points}/${store.PROMOTION_POINTS} pts`, 'battles'),
+      modeTile('duel', '1V1 ONLINE', duelRoom ? (duelRoom.result ? `Room ${duelRoom.code} · result` : `Room ${duelRoom.code} · waiting`) : 'Play a friend', 'duel'),
       modeTile('rivals', 'RIVALS', `${rank.name} · ${rivals.points || 0} pts`, 'rivals'),
       modeTile('club', 'CLUB', `${state.club.length} players signed`, 'club'),
       modeTile('career', 'CAREER', careerState ? (careerState.manager ? `${careerState.name} · manager` : `${careerState.name} · ${careerState.clubName}`) : 'Create your pro', 'career'),
@@ -1216,6 +1236,187 @@ export function mountUltimateTeam({ data }) {
   }
 
   // ── Events ───────────────────────────────────────────────────────────────
+  // ── Online 1v1 ────────────────────────────────────────────────────────────
+  function duelSquad() {
+    const starters = metrics().starters || [];
+    if (starters.length !== 11 || starters.some((entry) => !entry.player)) return null;
+    return starters.map((entry) => ({ name: entry.player.name, pos: entry.slot.pos, ovr: entry.player.ovr }));
+  }
+
+  async function duelRequest(path, body) {
+    let response;
+    try {
+      response = await fetch(
+        `/api/uf27/match/${path}`,
+        body
+          ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+          : { headers: { accept: 'application/json' } },
+      );
+    } catch {
+      throw new Error('1v1 is online only — check your connection.');
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Online match failed.');
+    return payload;
+  }
+
+  function saveDuel() {
+    try {
+      if (duelRoom) localStorage.setItem(DUEL_KEY, JSON.stringify(duelRoom));
+      else localStorage.removeItem(DUEL_KEY);
+    } catch {
+      /* storage is optional */
+    }
+  }
+
+  function stopDuelPoll() {
+    if (duelTimer) clearInterval(duelTimer);
+    duelTimer = null;
+    duelPolling = false;
+  }
+
+  function startDuelPoll() {
+    stopDuelPoll();
+    if (!duelRoom || duelRoom.result) return;
+    duelTimer = setInterval(async () => {
+      if (!duelRoom || duelRoom.result || duelPolling) return;
+      duelPolling = true;
+      const room = duelRoom;
+      try {
+        const payload = await duelRequest(`state?code=${encodeURIComponent(room.code)}&token=${encodeURIComponent(room.token)}`);
+        if (duelRoom === room && payload.status === 'done' && payload.result) {
+          duelRoom = { ...room, result: payload.result };
+          saveDuel();
+          duelError = '';
+          stopDuelPoll();
+          render();
+          toast('Opponent found — full time!');
+        }
+      } catch (error) {
+        if (duelRoom === room && /no room|expired|not allowed/i.test(error.message)) {
+          duelError = error.message;
+          stopDuelPoll();
+          render();
+        }
+      }
+      duelPolling = false;
+    }, 2500);
+  }
+
+  async function createDuel() {
+    const squad = duelSquad();
+    if (!squad) {
+      toast('Fill all 11 starting slots before playing online.');
+      return;
+    }
+    duelBusy = true;
+    duelError = '';
+    render();
+    try {
+      const payload = await duelRequest('create', { name: state.clubName, squad });
+      duelRoom = { code: payload.code, token: payload.token, role: payload.role, result: null };
+      saveDuel();
+      startDuelPoll();
+      toast(`Room ${payload.code} created — share the code.`);
+    } catch (error) {
+      duelError = error.message;
+    }
+    duelBusy = false;
+    render();
+  }
+
+  async function joinDuel() {
+    const input = overlay.querySelector('[data-ut="duel-code"]');
+    const code = String((input && input.value) || '').trim().toUpperCase();
+    if (!/^[A-F0-9]{6}$/.test(code)) {
+      duelError = 'Room codes are six characters, like 4F2A9C.';
+      render();
+      return;
+    }
+    const squad = duelSquad();
+    if (!squad) {
+      toast('Fill all 11 starting slots before playing online.');
+      return;
+    }
+    duelBusy = true;
+    duelError = '';
+    render();
+    try {
+      const payload = await duelRequest('join', { code, name: state.clubName, squad });
+      duelRoom = { code: payload.code, token: payload.token, role: payload.role, result: payload.result };
+      saveDuel();
+      stopDuelPoll();
+      toast('Room joined — full time!');
+    } catch (error) {
+      duelError = error.message;
+    }
+    duelBusy = false;
+    render();
+  }
+
+  function duelResultView() {
+    const result = duelRoom.result;
+    const home = duelRoom.role === 'host';
+    const mine = home ? result.homeGoals : result.awayGoals;
+    const theirs = home ? result.awayGoals : result.homeGoals;
+    const myName = home ? result.homeName : result.awayName;
+    const theirName = home ? result.awayName : result.homeName;
+    const outcome = mine > theirs ? 'WIN' : mine === theirs ? 'DRAW' : 'LOSS';
+    return `
+      <section class="ut-duel">
+        <div class="ut-section-head"><div><small>ONLINE 1V1 · ROOM ${esc(duelRoom.code)}</small><h2>FULL TIME</h2></div><span class="ut-chip">${outcome}</span></div>
+        <div class="ut-duel-score">
+          <div><small>${esc(myName)}</small><b>${mine}</b></div>
+          <span>–</span>
+          <div><small>${esc(theirName)}</small><b>${theirs}</b></div>
+        </div>
+        <div class="ut-duel-meta"><span>YOUR XI ${home ? result.hostRating : result.guestRating} OVR</span><span>OPPONENT XI ${home ? result.guestRating : result.hostRating} OVR</span></div>
+        <div class="ut-duel-events">
+          ${result.events.length ? result.events.map((event) => `<div class="ut-duel-event"><b>${event.minute}'</b><span>${esc(event.scorer)}</span><small>${event.side === 'home' ? esc(result.homeName) : esc(result.awayName)}</small></div>`).join('') : '<p class="ut-hint">No goals — a genuine 0-0.</p>'}
+        </div>
+        <div class="ut-career-actions"><button class="ut-btn ut-btn-primary" type="button" data-ut="duel-reset">NEW ROOM</button></div>
+      </section>`;
+  }
+
+  function duelView() {
+    if (duelRoom && duelRoom.result) return duelResultView();
+    const squad = duelSquad();
+    if (duelRoom) {
+      const ready = squad ? '' : '<p class="ut-hint">Your XI changed after this room was made — the squad sent to the server is the one from kick-off.</p>';
+      return `
+        <section class="ut-duel">
+          <div class="ut-section-head"><div><small>ONLINE 1V1 · WAITING ROOM</small><h2>ROOM ${esc(duelRoom.code)}</h2></div><span class="ut-chip">WAITING</span></div>
+          <div class="ut-duel-wait">
+            <p>Share this code with your opponent. This screen checks for them every few seconds — the match kicks off the moment they join.</p>
+            <button class="ut-duel-code" type="button" data-ut="duel-copy" title="Copy room code">${esc(duelRoom.code)}<small>COPY CODE</small></button>
+            <div class="ut-duel-vs"><div><b>${esc(state.clubName)}</b><small>YOU · ${metrics().rating || '—'} OVR</small></div><span>VS</span><div><b>WAITING…</b><small>OPPONENT</small></div></div>
+            ${ready}
+            <div class="ut-career-actions"><button class="ut-btn ut-btn-ghost" type="button" data-ut="duel-leave">LEAVE ROOM</button></div>
+          </div>
+        </section>`;
+    }
+    return `
+      <section class="ut-duel">
+        <div class="ut-section-head"><div><small>ONLINE ONLY</small><h2>1V1 FRIENDLIES</h2></div><span class="ut-chip">LIVE</span></div>
+        <p class="ut-hint">Two players, two squads, one server-simulated match. There is no offline opponent: create a room and send the code to a friend, or join theirs. Both managers need a full XI.</p>
+        <div class="ut-duel-lobby">
+          <div class="ut-duel-card">
+            <small>HOST</small><h3>Create a room</h3>
+            <p>Your current XI is registered with the room. You get a six-character code to share.</p>
+            <button class="ut-btn ut-btn-primary" type="button" data-ut="duel-create" ${!squad || duelBusy ? 'disabled' : ''}>${duelBusy ? 'CREATING…' : 'CREATE ROOM'}</button>
+          </div>
+          <div class="ut-duel-card">
+            <small>GUEST</small><h3>Join a room</h3>
+            <p>Enter the code your opponent sent. The result is simulated on the server as soon as you join.</p>
+            <input class="ut-input ut-duel-input" data-ut="duel-code" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false" aria-label="Room code">
+            <button class="ut-btn ut-btn-primary" type="button" data-ut="duel-join" ${!squad || duelBusy ? 'disabled' : ''}>${duelBusy ? 'WORKING…' : 'JOIN ROOM'}</button>
+          </div>
+        </div>
+        ${squad ? '' : '<p class="ut-hint">Fill all 11 starting slots in SQUAD to unlock online play.</p>'}
+        ${duelError ? `<p class="ut-error">${esc(duelError)}</p>` : ''}
+      </section>`;
+  }
+
   function onClick(event) {
     const button = event.target.closest('[data-ut]');
     if (!button || !overlay.contains(button)) return;
@@ -1231,6 +1432,7 @@ export function mountUltimateTeam({ data }) {
         moveUid = null;
         lastTapUid = null;
         render();
+        if (tab === 'duel') startDuelPoll();
         return;
       case 'autofill':
         store.autoFill(state);
@@ -1301,6 +1503,40 @@ export function mountUltimateTeam({ data }) {
         }
         return;
       }
+      case 'duel-create':
+        createDuel();
+        return;
+      case 'duel-join':
+        joinDuel();
+        return;
+      case 'duel-copy': {
+        const code = duelRoom && duelRoom.code;
+        if (!code) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).then(() => toast('Room code copied.')).catch(() => toast(`Room code: ${code}`));
+        } else {
+          toast(`Room code: ${code}`);
+        }
+        return;
+      }
+      case 'duel-leave':
+        openModal({
+          title: 'Leave this room?',
+          subtitle: 'ONLINE 1V1',
+          body: '<p class="ut-hint">Your room closes for you, and the code can no longer be used to reach this match.</p>',
+          actions: '<button class="ut-btn ut-btn-ghost" type="button" data-ut="modal-close">STAY</button><button class="ut-btn ut-btn-danger" type="button" data-ut="duel-leave-confirm">LEAVE ROOM</button>',
+        });
+        return;
+      case 'duel-leave-confirm':
+      case 'duel-reset':
+        stopDuelPoll();
+        duelRoom = null;
+        duelError = '';
+        saveDuel();
+        closeModal();
+        render();
+        toast('Room left.');
+        return;
       case 'slot': {
         const index = Number(button.dataset.slot);
         const uid = state.squad[index];
@@ -1592,6 +1828,7 @@ export function mountUltimateTeam({ data }) {
     overlay.hidden = false;
     document.documentElement.classList.add('ut-open');
     render();
+    if (duelRoom && !duelRoom.result) startDuelPoll();
     if (data.status === 'degraded' && !degradedNoticeShown) {
       degradedNoticeShown = true;
       toast('Limited data: club metadata was unavailable, names are derived.');
@@ -1602,6 +1839,7 @@ export function mountUltimateTeam({ data }) {
 
   function close() {
     if (!overlay) return;
+    stopDuelPoll();
     closeModal();
     overlay.hidden = true;
     document.documentElement.classList.remove('ut-open');
@@ -1618,5 +1856,5 @@ export function mountUltimateTeam({ data }) {
 
   window.addEventListener('keydown', onKeyDown, true);
 
-  return { open, close, isOpen, state, data, getCareer: () => careerState };
+  return { open, close, isOpen, state, data, getCareer: () => careerState, getDuel: () => duelRoom };
 }
