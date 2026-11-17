@@ -257,6 +257,67 @@ export function clearSlot(state, index) {
   return state;
 }
 
+function slotIndexFor(state, uid) {
+  const key = Object.keys(state.squad).find((entry) => state.squad[entry] === uid);
+  return key === undefined ? null : Number(key);
+}
+
+// Swap two players wherever they are: XI to XI, XI to bench or bench to bench.
+export function swapPlayers(state, uidA, uidB) {
+  if (!uidA || !uidB || uidA === uidB) return state;
+  const aSlot = slotIndexFor(state, uidA);
+  const bSlot = slotIndexFor(state, uidB);
+  const aBench = state.bench.indexOf(uidA);
+  const bBench = state.bench.indexOf(uidB);
+  if (aSlot !== null && bSlot !== null) {
+    state.squad[aSlot] = uidB;
+    state.squad[bSlot] = uidA;
+  } else if (aSlot !== null && bBench >= 0) {
+    state.squad[aSlot] = uidB;
+    state.bench[bBench] = uidA;
+  } else if (aBench >= 0 && bSlot !== null) {
+    state.bench[aBench] = uidB;
+    state.squad[bSlot] = uidA;
+  } else if (aBench >= 0 && bBench >= 0) {
+    state.bench[aBench] = uidB;
+    state.bench[bBench] = uidA;
+  } else {
+    return state;
+  }
+  saveState(state);
+  return state;
+}
+
+// Drop a player into an empty pitch slot, benching anyone already there.
+export function moveToSlot(state, index, uid) {
+  if (!uid) return state;
+  Object.keys(state.squad).forEach((key) => {
+    if (state.squad[key] === uid) delete state.squad[key];
+  });
+  const displaced = state.squad[index];
+  state.squad[index] = uid;
+  state.bench = state.bench.filter((id) => id !== uid && id !== displaced);
+  if (displaced) state.bench = [displaced, ...state.bench].slice(0, BENCH_SIZE);
+  saveState(state);
+  return state;
+}
+
+// Drop a player onto an empty substitute slot.
+export function moveToBench(state, index, uid) {
+  if (!uid) return state;
+  Object.keys(state.squad).forEach((key) => {
+    if (state.squad[key] === uid) delete state.squad[key];
+  });
+  const rest = state.bench.filter((id) => id !== uid);
+  const displaced = rest[index];
+  const next = rest.slice();
+  next[index] = uid;
+  if (displaced) next.push(displaced);
+  state.bench = next.filter(Boolean).slice(0, BENCH_SIZE);
+  saveState(state);
+  return state;
+}
+
 export function autoFill(state) {
   const metrics = squadMetrics(state);
   const used = new Set(Object.values(state.squad));

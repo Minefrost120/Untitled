@@ -65,6 +65,7 @@ export function mountUltimateTeam({ data }) {
   let tab = 'home';
   let activeClip = 'Idle';
   let selectedUid = Object.keys(state.squad).map((key) => state.squad[key])[0] || null;
+  let moveUid = null;
   let pickerIndex = null;
   let clubQuery = '';
   let clubSort = 'ovr';
@@ -269,7 +270,7 @@ export function mountUltimateTeam({ data }) {
     }
     const affinity = positionAffinity(slot.pos, player.pos);
     const off = affinity === 1 ? '' : affinity >= 0.5 ? 'is-near' : 'is-out';
-    return `<button class="ut-slot ut-slot-${ovrTone(player.ovr)} ${off}" type="button" style="left:${left}%;top:${top}%" data-ut="slot" data-slot="${index}" aria-label="${esc(player.name)}, ${slot.pos}">
+    return `<button class="ut-slot ut-slot-${ovrTone(player.ovr)} ${off} ${moveUid === player.uid ? 'is-picked' : ''}" type="button" draggable="true" style="left:${left}%;top:${top}%" data-ut="slot" data-slot="${index}" data-uid="${esc(player.uid)}" aria-pressed="${moveUid === player.uid}" aria-label="${esc(player.name)}, ${slot.pos}">
       <span class="ut-slot-art" aria-hidden="true">${SILHOUETTE}</span>
       <span class="ut-slot-top"><b class="ut-slot-ovr">${player.ovr}</b><span class="ut-slot-pos">${slot.pos}</span></span>
       <span class="ut-slot-name">${esc(shortName(player))}</span>
@@ -320,6 +321,8 @@ export function mountUltimateTeam({ data }) {
             <button class="ut-btn ut-btn-primary" type="button" data-ut="autofill">AUTO FILL</button>
           </div>
 
+          ${moveUid ? `<div class="ut-move-hint"><b>${esc(shortName(store.findPlayer(state, moveUid)))}</b> selected — tap another player or slot to swap<button class="ut-btn ut-btn-ghost" type="button" data-ut="cancel-move">CANCEL</button></div>` : ''}
+
           <div class="ut-pitch">
             <div class="ut-pitch-lines" aria-hidden="true"></div>
             <svg class="ut-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -340,10 +343,10 @@ export function mountUltimateTeam({ data }) {
                 .map((_, i) => {
                   const player = bench[i];
                   return player
-                    ? `<button class="ut-bench-slot" type="button" data-ut="select" data-uid="${esc(player.uid)}">
+                    ? `<button class="ut-bench-slot ${moveUid === player.uid ? 'is-picked' : ''}" type="button" draggable="true" data-ut="select" data-uid="${esc(player.uid)}" data-bench="${i}" aria-pressed="${moveUid === player.uid}">
                         <b>${player.ovr}</b><span>${esc(shortName(player, 10))}</span><small>${esc(player.pos)}</small>
                       </button>`
-                    : `<button class="ut-bench-slot is-empty" type="button" data-ut="autofill"><span>+</span><small>SUB</small></button>`;
+                    : `<button class="ut-bench-slot is-empty" type="button" data-ut="bench" data-bench="${i}"><span>+</span><small>SUB</small></button>`;
                 })
                 .join('')}
             </div>
@@ -967,6 +970,74 @@ export function mountUltimateTeam({ data }) {
     });
   }
 
+  // ── Swap + drag and drop ────────────────────────────────────────────────
+  function moveToTarget(target) {
+    const uid = moveUid;
+    moveUid = null;
+    if (!uid || !target) {
+      render();
+      return;
+    }
+    if (target.dataset.slot !== undefined) {
+      const index = Number(target.dataset.slot);
+      const occupant = state.squad[index];
+      if (occupant && occupant !== uid) store.swapPlayers(state, uid, occupant);
+      else if (!occupant) store.moveToSlot(state, index, uid);
+    } else if (target.dataset.bench !== undefined) {
+      const index = Number(target.dataset.bench);
+      const occupant = state.bench[index];
+      if (occupant && occupant !== uid) store.swapPlayers(state, uid, occupant);
+      else if (!occupant) store.moveToBench(state, index, uid);
+    } else if (target.dataset.uid) {
+      store.swapPlayers(state, uid, target.dataset.uid);
+    }
+    selectedUid = uid;
+    render();
+    toast('Players swapped.');
+  }
+
+  function onDragStart(event) {
+    const source = event.target.closest('[data-uid]');
+    if (!source || !overlay.contains(source)) return;
+    moveUid = source.dataset.uid;
+    source.classList.add('is-dragging');
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      try {
+        event.dataTransfer.setData('text/plain', moveUid);
+      } catch {
+        /* older browsers */
+      }
+    }
+  }
+
+  function onDragOver(event) {
+    const target = event.target.closest('[data-slot], [data-bench]');
+    if (!target || !overlay.contains(target)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    overlay.querySelectorAll('.is-drag-over').forEach((el) => el.classList.remove('is-drag-over'));
+    target.classList.add('is-drag-over');
+  }
+
+  function onDrop(event) {
+    const target = event.target.closest('[data-slot], [data-bench]');
+    overlay.querySelectorAll('.is-drag-over, .is-dragging').forEach((el) => el.classList.remove('is-drag-over', 'is-dragging'));
+    if (!target) {
+      moveUid = null;
+      return;
+    }
+    event.preventDefault();
+    const carried = moveUid || (event.dataTransfer && event.dataTransfer.getData('text/plain'));
+    if (!carried) return;
+    moveUid = carried;
+    moveToTarget(target);
+  }
+
+  function onDragEnd() {
+    overlay.querySelectorAll('.is-drag-over, .is-dragging').forEach((el) => el.classList.remove('is-drag-over', 'is-dragging'));
+  }
+
   // ── Events ───────────────────────────────────────────────────────────────
   function onClick(event) {
     const button = event.target.closest('[data-ut]');
@@ -990,16 +1061,51 @@ export function mountUltimateTeam({ data }) {
       case 'slot': {
         const index = Number(button.dataset.slot);
         const uid = state.squad[index];
+        if (moveUid) {
+          if (moveUid === uid) {
+            moveUid = null;
+            render();
+            return;
+          }
+          moveToTarget(button);
+          return;
+        }
         if (uid) {
           selectedUid = uid;
+          moveUid = uid;
           if (tab === 'squad') render();
         } else {
           openPicker(index);
         }
         return;
       }
-      case 'select':
-        selectedUid = button.dataset.uid;
+      case 'select': {
+        const uid = button.dataset.uid;
+        if (moveUid && moveUid !== uid) {
+          moveToTarget(button);
+          return;
+        }
+        selectedUid = uid;
+        moveUid = moveUid === uid ? null : uid;
+        render();
+        return;
+      }
+      case 'bench': {
+        const index = Number(button.dataset.bench);
+        if (moveUid) {
+          store.moveToBench(state, index, moveUid);
+          moveUid = null;
+          render();
+          toast('Player moved to the bench.');
+        } else {
+          store.autoFill(state);
+          render();
+          toast('Bench filled with your best available players.');
+        }
+        return;
+      }
+      case 'cancel-move':
+        moveUid = null;
         render();
         return;
       case 'anim':
@@ -1010,11 +1116,13 @@ export function mountUltimateTeam({ data }) {
       case 'assign':
         store.assignToSlot(state, pickerIndex, button.dataset.uid);
         selectedUid = button.dataset.uid;
+        moveUid = null;
         closeModal();
         render();
         return;
       case 'move-bench': {
         const uid = button.dataset.uid;
+        moveUid = null;
         Object.keys(state.squad).forEach((key) => {
           if (state.squad[key] === uid) delete state.squad[key];
         });
@@ -1031,6 +1139,7 @@ export function mountUltimateTeam({ data }) {
       case 'release-confirm': {
         const result = store.releasePlayer(state, button.dataset.uid);
         if (selectedUid === button.dataset.uid) selectedUid = null;
+        if (moveUid === button.dataset.uid) moveUid = null;
         closeModal();
         render();
         toast(`Released for ${coins(result.refund)} coins.`);
@@ -1094,6 +1203,7 @@ export function mountUltimateTeam({ data }) {
       case 'reset-confirm': {
         Object.assign(state, store.resetState(data));
         selectedUid = Object.keys(state.squad).map((key) => state.squad[key])[0] || null;
+        moveUid = null;
         tab = 'squad';
         closeModal();
         render();
@@ -1186,6 +1296,10 @@ export function mountUltimateTeam({ data }) {
       overlay.addEventListener('click', onClick);
       overlay.addEventListener('input', onInput);
       overlay.addEventListener('change', onChange);
+      overlay.addEventListener('dragstart', onDragStart);
+      overlay.addEventListener('dragover', onDragOver);
+      overlay.addEventListener('drop', onDrop);
+      overlay.addEventListener('dragend', onDragEnd);
       document.body.appendChild(overlay);
       document.documentElement.classList.add('ut-supported');
     }
