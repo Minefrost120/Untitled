@@ -14,26 +14,45 @@ const shortName = (player, max = 13) => {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name.toUpperCase();
 };
 const ovrTone = (ovr) => (ovr >= 85 ? 'elite' : ovr >= 78 ? 'gold' : ovr >= 68 ? 'silver' : 'bronze');
+const RARITY_LABEL = { elite: 'ICON', gold: 'GOLD', silver: 'SILVER', bronze: 'BRONZE' };
+const difficultyStars = (rating) => {
+  const filled = rating >= 86 ? 5 : rating >= 80 ? 4 : 3;
+  return '\u2605'.repeat(filled) + '\u2606'.repeat(5 - filled);
+};
 
-function playerCard(player, options = {}) {
-  const { action = 'pick', selected = false, showRelease = false } = options;
-  if (!player) return '';
-  return `
-    <button class="ut-card ut-card-${ovrTone(player.ovr)} ${selected ? 'is-selected' : ''}" type="button"
-      data-ut="${action}" data-uid="${esc(player.uid)}">
-      <span class="ut-card-stripe" style="background:${esc(player.clubColor)}"></span>
-      <span class="ut-card-top">
-        <b class="ut-card-ovr">${player.ovr}</b>
-        <span class="ut-card-pos">${esc(player.pos)}</span>
-      </span>
-      <span class="ut-card-name">${esc(player.name)}</span>
-      <span class="ut-card-meta">${esc(player.clubShort)} · ${esc(player.nat)}</span>
-      <span class="ut-card-foot">
-        <span>${esc(player.leagueName)}</span>
-        ${showRelease ? '' : '<i aria-hidden="true">›</i>'}
-      </span>
-    </button>`;
-}
+// Original artwork: a generic player silhouette and simple line icons, drawn
+// for this app rather than borrowed from any commercial interface.
+const SILHOUETTE = `<svg viewBox="0 0 120 150" aria-hidden="true" focusable="false"><circle cx="60" cy="34" r="19" fill="currentColor"/><path d="M60 58c-18 0-31 12-35 30l-7 62h84l-7-62c-4-18-17-30-35-30Z" fill="currentColor"/><path d="M31 92 12 118l10 8 20-24Zm58 0 19 26-10 8-20-24Z" fill="currentColor"/></svg>`;
+
+const TAB_ICONS = {
+  squad: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l3 4-2 3v11H7V10L5 7l3-4Z"/><path d="M9 3v4h6V3"/></svg>`,
+  store: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v12H4z"/><path d="M4 8 6.5 3h11L20 8"/><path d="M12 8v12"/></svg>`,
+  battles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z"/><path d="m9 11 2 2 4-4"/></svg>`,
+  club: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
+};
+
+  function playerCard(player, options = {}) {
+    const { action = 'pick', selected = false, showRelease = false } = options;
+    if (!player) return '';
+    const tone = ovrTone(player.ovr);
+    return `
+      <button class="ut-card ut-card-${tone} ${selected ? 'is-selected' : ''}" type="button"
+        data-ut="${action}" data-uid="${esc(player.uid)}">
+        <span class="ut-card-stripe" style="background:${esc(player.clubColor)}"></span>
+        <span class="ut-card-art" aria-hidden="true">${SILHOUETTE}</span>
+        <span class="ut-card-rarity">${RARITY_LABEL[tone]}</span>
+        <span class="ut-card-top">
+          <b class="ut-card-ovr">${player.ovr}</b>
+          <span class="ut-card-pos">${esc(player.pos)}</span>
+        </span>
+        <span class="ut-card-name">${esc(player.name)}</span>
+        <span class="ut-card-meta">${esc(player.clubShort)} · ${esc(player.nat)}</span>
+        <span class="ut-card-foot">
+          <span>${esc(player.leagueName)}</span>
+          ${showRelease ? '' : '<i aria-hidden="true">›</i>'}
+        </span>
+      </button>`;
+  }
 
 export function mountUltimateTeam({ data }) {
   const showcase = createShowcase();
@@ -119,37 +138,52 @@ export function mountUltimateTeam({ data }) {
   function render() {
     if (!overlay) return;
     const m = metrics();
+    const initials =
+      (state.clubName || 'UF')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word[0])
+        .join('')
+        .toUpperCase() || 'UF';
+
     overlay.innerHTML = `
       <div class="ut-bg" aria-hidden="true"></div>
       <header class="ut-head">
         <button class="ut-back" type="button" data-ut="close"><span aria-hidden="true">←</span> BACK</button>
+        <div class="ut-club-id">
+          <span class="ut-crest" aria-hidden="true">${esc(initials)}</span>
+          <span class="ut-club-text">
+            <button class="ut-club-name" type="button" data-ut="rename" title="Rename your club">${esc(state.clubName)}</button>
+            <small class="ut-division">${esc(store.divisionName(state.division))}</small>
+          </span>
+        </div>
         <div class="ut-brand">
           <span class="ut-brand-mark">UF<i>27</i></span>
           <span class="ut-brand-text"><b>ULTIMATE</b><em>TEAM</em></span>
         </div>
-        <div class="ut-clubbox">
-          <button class="ut-club-name" type="button" data-ut="rename" title="Rename your club">${esc(state.clubName)}</button>
-          <span class="ut-division">${esc(store.divisionName(state.division))}</span>
-        </div>
         ${data.status === 'degraded' ? '<span class="ut-warn" title="Club or league metadata was unavailable; names are derived locally">LIMITED DATA</span>' : ''}
-        <div class="ut-coins" title="Coins"><span aria-hidden="true">◉</span><b>${coins(state.coins)}</b><small>COINS</small></div>
+        <div class="ut-coins" title="Coins"><span class="ut-coin" aria-hidden="true">C</span><b>${coins(state.coins)}</b><small>COINS</small></div>
       </header>
-      <nav class="ut-tabs" aria-label="Ultimate Team sections">
-        ${[
-          ['squad', 'SQUAD', `${m.filledCount}/${m.totalSlots}`],
-          ['store', 'STORE', 'PACKS'],
-          ['battles', 'SQUAD BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
-          ['club', 'CLUB', `${state.club.length}`],
-        ]
-          .map(
-            ([id, label, meta]) => `
-          <button class="ut-tab ${tab === id ? 'is-active' : ''}" type="button" data-ut="tab" data-tab="${id}">
-            <b>${label}</b><small>${esc(meta)}</small>
-          </button>`,
-          )
-          .join('')}
-      </nav>
-      <main class="ut-body">${tab === 'squad' ? squadView() : tab === 'store' ? storeView() : tab === 'battles' ? battlesView() : clubView()}</main>
+      <div class="ut-shell">
+        <nav class="ut-tabs" aria-label="Ultimate Team sections">
+          ${[
+            ['squad', 'SQUAD', `${m.filledCount}/${m.totalSlots}`],
+            ['store', 'STORE', 'PACKS'],
+            ['battles', 'BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
+            ['club', 'CLUB', `${state.club.length}`],
+          ]
+            .map(
+              ([id, label, meta]) => `
+            <button class="ut-tab ${tab === id ? 'is-active' : ''}" type="button" data-ut="tab" data-tab="${id}"${tab === id ? ' aria-current="page"' : ''}>
+              <span class="ut-tab-icon" aria-hidden="true">${TAB_ICONS[id]}</span>
+              <span class="ut-tab-label"><b>${label}</b><small>${esc(meta)}</small></span>
+            </button>`,
+            )
+            .join('')}
+        </nav>
+        <main class="ut-body">${tab === 'squad' ? squadView() : tab === 'store' ? storeView() : tab === 'battles' ? battlesView() : clubView()}</main>
+      </div>
     `;
 
     if (tab === 'squad') {
@@ -183,35 +217,67 @@ export function mountUltimateTeam({ data }) {
     }
     const affinity = positionAffinity(slot.pos, player.pos);
     const off = affinity === 1 ? '' : affinity >= 0.5 ? 'is-near' : 'is-out';
-    return `<button class="ut-slot ${off}" type="button" style="left:${left}%;top:${top}%" data-ut="slot" data-slot="${index}" aria-label="${esc(player.name)}, ${slot.pos}">
-      <span class="ut-slot-ovr">${player.ovr}</span>
+    return `<button class="ut-slot ut-slot-${ovrTone(player.ovr)} ${off}" type="button" style="left:${left}%;top:${top}%" data-ut="slot" data-slot="${index}" aria-label="${esc(player.name)}, ${slot.pos}">
+      <span class="ut-slot-art" aria-hidden="true">${SILHOUETTE}</span>
+      <span class="ut-slot-top"><b class="ut-slot-ovr">${player.ovr}</b><span class="ut-slot-pos">${slot.pos}</span></span>
       <span class="ut-slot-name">${esc(shortName(player))}</span>
-      <span class="ut-slot-pos">${slot.pos}</span>
       <span class="ut-slot-chem"><i style="width:${entry.chem}%"></i></span>
     </button>`;
+  }
+
+  function chemistryLinks(starters) {
+    const points = starters.filter((entry) => entry.player).map((entry) => ({ entry, x: slotLeft(entry.slot.x), y: slotTop(entry.slot.d) }));
+    const lines = [];
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const a = points[i];
+        const b = points[j];
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (distance > 38) continue;
+        const sameClub = a.entry.player.clubId === b.entry.player.clubId;
+        const sameNation = a.entry.player.nat === b.entry.player.nat;
+        const sameLeague = a.entry.player.leagueId === b.entry.player.leagueId;
+        if (!sameClub && !sameNation && !(sameLeague && distance < 30)) continue;
+        lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, type: sameClub ? 'club' : sameNation ? 'nation' : 'league' });
+      }
+    }
+    return lines;
   }
 
   function squadView() {
     const m = metrics();
     const bench = store.benchPlayers(state);
     const selected = selectedPlayer();
+    const links = chemistryLinks(m.starters);
 
     return `
       <section class="ut-squad">
         <div class="ut-squad-main">
           <div class="ut-squad-bar">
-            <div class="ut-metric"><small>SQUAD RATING</small><b>${m.rating || '—'}</b></div>
-            <div class="ut-metric"><small>CHEMISTRY</small><b>${m.chemistry}</b><i class="ut-chem"><span style="width:${m.chemistry}%"></span></i></div>
+            <div class="ut-rating"><small>SQUAD RATING</small><b>${m.rating || '—'}</b></div>
+            <div class="ut-chem-block">
+              <small>CHEMISTRY</small>
+              <div class="ut-chem"><span style="width:${m.chemistry}%"></span></div>
+              <b>${m.chemistry}<i>/100</i></b>
+            </div>
             <label class="ut-select"><small>FORMATION</small>
               <select data-ut="formation">
                 ${FORMATION_IDS.map((id) => `<option value="${id}" ${state.formation === id ? 'selected' : ''}>${FORMATIONS[id].name}</option>`).join('')}
               </select>
             </label>
-            <button class="ut-btn ut-btn-ghost" type="button" data-ut="autofill">AUTO FILL</button>
+            <button class="ut-btn ut-btn-primary" type="button" data-ut="autofill">AUTO FILL</button>
           </div>
 
           <div class="ut-pitch">
             <div class="ut-pitch-lines" aria-hidden="true"></div>
+            <svg class="ut-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              ${links
+                .map(
+                  (line) =>
+                    `<line class="ut-link ut-link-${line.type}" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" vector-effect="non-scaling-stroke" />`,
+                )
+                .join('')}
+            </svg>
             ${m.starters.map(slotMarkup).join('')}
           </div>
 
@@ -306,8 +372,10 @@ export function mountUltimateTeam({ data }) {
         <div class="ut-pack-grid">
           ${store.PACKS.map(
             (pack) => `
-            <article class="ut-pack" style="--pack:${pack.color}">
-              <span class="ut-pack-orb" aria-hidden="true">${pack.count}</span>
+            <article class="ut-pack" style="--pack:${pack.color};--pack-soft:${pack.color}24;--pack-line:${pack.color}66">
+              <span class="ut-pack-foil" aria-hidden="true"></span>
+              <span class="ut-pack-tag">PACK</span>
+              <span class="ut-pack-orb" aria-hidden="true"><b>${pack.count}</b><small>PLAYERS</small></span>
               <h3>${pack.name}</h3>
               <p>${pack.blurb}</p>
               <dl><div><dt>PLAYERS</dt><dd>${pack.count}</dd></div><div><dt>RATING</dt><dd>${pack.min}–${pack.max}</dd></div></dl>
@@ -336,8 +404,11 @@ export function mountUltimateTeam({ data }) {
         <div class="ut-opp-grid">
           ${store.OPPONENTS.map(
             (opponent) => `
-            <article class="ut-opp" style="--opp:${opponent.color}">
-              <div class="ut-opp-crest">${esc(opponent.short)}</div>
+            <article class="ut-opp" style="--opp:${opponent.color};--opp-soft:${opponent.color}1f;--opp-line:${opponent.color}55">
+              <div class="ut-opp-top">
+                <div class="ut-opp-crest">${esc(opponent.short)}</div>
+                <span class="ut-opp-stars" aria-hidden="true">${difficultyStars(opponent.rating)}</span>
+              </div>
               <h3>${esc(opponent.name)}</h3>
               <div class="ut-opp-stats"><span>OVR <b>${opponent.rating}</b></span><span>REWARD <b>${coins(Math.round((opponent.rating * 22 + 120) * opponent.reward))}</b></span></div>
               <button class="ut-btn ut-btn-primary" type="button" data-ut="battle" data-opp="${opponent.id}" ${m.filledCount < 11 ? 'disabled' : ''}>
