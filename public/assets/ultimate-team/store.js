@@ -318,6 +318,23 @@ export function buyPack(state, data, packId) {
   return { ok: true, signings, pack };
 }
 
+// ── Transfer market ───────────────────────────────────────────────────────
+export function marketPrice(player) {
+  return Math.max(300, round(Math.pow(Math.max(50, player.ovr) - 40, 2) * 1.1));
+}
+
+export function buyMarketPlayer(state, data, key) {
+  const source = data.pool.find((player) => `${player.sid}:${player.clubId}` === key);
+  if (!source) return { ok: false, reason: 'missing' };
+  const price = marketPrice(source);
+  if (state.coins < price) return { ok: false, reason: 'coins', price };
+  const signed = instantiate(source);
+  state.club.push(signed);
+  state.coins -= price;
+  saveState(state);
+  return { ok: true, player: signed, price };
+}
+
 function poisson(lambda) {
   const limit = Math.exp(-lambda);
   let goals = 0;

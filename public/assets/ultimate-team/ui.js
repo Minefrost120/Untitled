@@ -29,6 +29,7 @@ const TAB_ICONS = {
   store: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v12H4z"/><path d="M4 8 6.5 3h11L20 8"/><path d="M12 8v12"/></svg>`,
   battles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z"/><path d="m9 11 2 2 4-4"/></svg>`,
   club: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
+  market: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 13H5L3 7Z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M9 13h6M9 16h4"/></svg>`,
   home: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/></svg>`,
   rivals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 6 7 6-7"/><path d="m6 13 6 7 6-7"/></svg>`,
   objectives: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
@@ -68,6 +69,27 @@ export function mountUltimateTeam({ data }) {
   let clubQuery = '';
   let clubSort = 'ovr';
   const picker = { query: '', pos: 'ALL', league: 'ALL' };
+  let marketQuery = '';
+  let marketPos = 'ALL';
+  let marketLeague = 'ALL';
+  let marketNation = 'ALL';
+  let marketSort = 'price';
+  let walkoutTimer = null;
+  const marketOptions = (() => {
+    const leagues = new Map();
+    const nations = new Set();
+    const positions = new Set();
+    data.pool.forEach((player) => {
+      leagues.set(player.leagueId, player.leagueName);
+      nations.add(player.nat);
+      positions.add(player.pos);
+    });
+    return {
+      leagues: [...leagues].sort((a, b) => String(a[1]).localeCompare(String(b[1]))),
+      nations: [...nations].sort(),
+      positions: [...positions].sort(),
+    };
+  })();
   let overlay = null;
   let modal = null;
   let matchTimer = null;
@@ -93,6 +115,10 @@ export function mountUltimateTeam({ data }) {
     if (matchTimer) {
       clearInterval(matchTimer);
       matchTimer = null;
+    }
+    if (walkoutTimer) {
+      clearTimeout(walkoutTimer);
+      walkoutTimer = null;
     }
     const finishing = Boolean(matchResult && !matchFinished);
     if (modal) {
@@ -177,6 +203,7 @@ export function mountUltimateTeam({ data }) {
             ['home', 'HOME', 'HUB'],
             ['squad', 'SQUAD', `${m.filledCount}/${m.totalSlots}`],
             ['store', 'STORE', 'PACKS'],
+            ['market', 'MARKET', 'BUY'],
             ['battles', 'BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
             ['rivals', 'RIVALS', rivalRank],
             ['club', 'CLUB', `${state.club.length}`],
@@ -198,6 +225,8 @@ export function mountUltimateTeam({ data }) {
               ? squadView()
               : tab === 'store'
                 ? storeView()
+                : tab === 'market'
+                  ? marketView()
                 : tab === 'battles'
                   ? battlesView()
                   : tab === 'rivals'
@@ -411,6 +440,7 @@ export function mountUltimateTeam({ data }) {
     const tiles = [
       modeTile('squad', 'SQUAD', `${m.filledCount}/${m.totalSlots} players · OVR ${m.rating || '—'}`, 'squad'),
       modeTile('store', 'STORE', `${store.PACKS.length} packs · ${coins(state.coins)} coins`, 'store'),
+      modeTile('market', 'MARKET', `${data.pool.length.toLocaleString('en-GB')} players to sign`, 'market'),
       modeTile('battles', 'SQUAD BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L · ${state.points}/${store.PROMOTION_POINTS} pts`, 'battles'),
       modeTile('rivals', 'RIVALS', `${rank.name} · ${rivals.points || 0} pts`, 'rivals'),
       modeTile('club', 'CLUB', `${state.club.length} players signed`, 'club'),
@@ -517,6 +547,75 @@ export function mountUltimateTeam({ data }) {
             .join('')}
         </div>
       </section>`;
+  }
+
+  // ── Market ───────────────────────────────────────────────────────────────
+  function marketResults() {
+    const query = marketQuery.trim().toLowerCase();
+    let list = data.pool;
+    if (query) list = list.filter((player) => player.name.toLowerCase().includes(query));
+    if (marketPos !== 'ALL') list = list.filter((player) => player.pos === marketPos);
+    if (marketLeague !== 'ALL') list = list.filter((player) => player.leagueId === marketLeague);
+    if (marketNation !== 'ALL') list = list.filter((player) => player.nat === marketNation);
+    const sorted = list
+      .slice()
+      .sort((a, b) => (marketSort === 'price' ? a.ovr - b.ovr : marketSort === 'name' ? a.name.localeCompare(b.name) : b.ovr - a.ovr));
+    return { total: sorted.length, list: sorted.slice(0, 40) };
+  }
+
+  function marketRow(player) {
+    const price = store.marketPrice(player);
+    const key = `${player.sid}:${player.clubId}`;
+    return `<article class="ut-market-row">
+      <b class="ut-mkt-ovr ut-card-${ovrTone(player.ovr)}">${player.ovr}</b>
+      <span class="ut-mkt-pos">${esc(player.pos)}</span>
+      <span class="ut-mkt-name"><strong>${esc(player.name)}</strong><small>${esc(player.clubName)} · ${esc(player.nat)} · ${esc(player.leagueName)}</small></span>
+      <span class="ut-mkt-price ${state.coins < price ? 'is-short' : ''}">${coins(price)}</span>
+      <button class="ut-btn ut-btn-primary" type="button" data-ut="buy" data-key="${esc(key)}" ${state.coins < price ? 'disabled' : ''}>BUY</button>
+    </article>`;
+  }
+
+  function marketView() {
+    const { total, list } = marketResults();
+    return `
+      <section class="ut-market">
+        <header class="ut-section-head">
+          <div><small>TRANSFER MARKET</small><h2>MARKET</h2><p>Buy any of the game's real players straight into your club. Prices scale with rating.</p></div>
+          <div class="ut-wallet"><span aria-hidden="true">◉</span><b>${coins(state.coins)}</b><small>COINS</small></div>
+        </header>
+        <div class="ut-market-tools">
+          <input class="ut-input" type="search" data-ut="market-search" placeholder="Search player" value="${esc(marketQuery)}" aria-label="Search the market">
+          <select class="ut-input" data-ut="market-pos" aria-label="Filter position">
+            <option value="ALL">All positions</option>
+            ${marketOptions.positions.map((pos) => `<option value="${pos}" ${marketPos === pos ? 'selected' : ''}>${pos}</option>`).join('')}
+          </select>
+          <select class="ut-input" data-ut="market-league" aria-label="Filter league">
+            <option value="ALL">All leagues</option>
+            ${marketOptions.leagues.map(([id, name]) => `<option value="${esc(id)}" ${marketLeague === id ? 'selected' : ''}>${esc(name)}</option>`).join('')}
+          </select>
+          <select class="ut-input" data-ut="market-nation" aria-label="Filter nation">
+            <option value="ALL">All nations</option>
+            ${marketOptions.nations.map((nat) => `<option value="${esc(nat)}" ${marketNation === nat ? 'selected' : ''}>${esc(nat)}</option>`).join('')}
+          </select>
+          <select class="ut-input" data-ut="market-sort" aria-label="Sort market">
+            <option value="ovr" ${marketSort === 'ovr' ? 'selected' : ''}>Rating</option>
+            <option value="price" ${marketSort === 'price' ? 'selected' : ''}>Price</option>
+            <option value="name" ${marketSort === 'name' ? 'selected' : ''}>Name</option>
+          </select>
+        </div>
+        <div class="ut-market-count"><small><b>${total.toLocaleString('en-GB')}</b> PLAYERS FOUND · SHOWING ${list.length}</small></div>
+        <div class="ut-market-list" data-market-list>
+          ${list.length ? list.map(marketRow).join('') : '<p class="ut-hint">No players match those filters.</p>'}
+        </div>
+      </section>`;
+  }
+
+  function refreshMarketList() {
+    const host = overlay && overlay.querySelector('[data-market-list]');
+    const count = overlay && overlay.querySelector('.ut-market-count small');
+    const { total, list } = marketResults();
+    if (count) count.innerHTML = `<b>${total.toLocaleString('en-GB')}</b> PLAYERS FOUND · SHOWING ${list.length}`;
+    if (host) host.innerHTML = list.length ? list.map(marketRow).join('') : '<p class="ut-hint">No players match those filters.</p>';
   }
 
   // ── Store ────────────────────────────────────────────────────────────────
@@ -684,16 +783,33 @@ export function mountUltimateTeam({ data }) {
       return;
     }
     render();
+    const grid = result.signings
+      .map((player) => `<div class="ut-reveal-card">${playerCard(player, { action: 'none' })}</div>`)
+      .join('');
+    const best = result.signings.slice().sort((a, b) => b.ovr - a.ovr)[0];
+    const walkout = Boolean(best && best.ovr >= 80);
     openModal({
       title: result.pack.name,
       subtitle: 'PACK OPENED',
       wide: true,
-      body: `<div class="ut-reveal">${result.signings
-        .map((player) => `<div class="ut-reveal-card">${playerCard(player, { action: 'none' })}</div>`)
-        .join('')}</div>`,
+      body: walkout
+        ? `<div class="ut-walkout"><small>WALKOUT</small>
+            <div class="ut-walkout-stage"><span class="ut-walkout-rays" aria-hidden="true"></span>
+              <div class="ut-walkout-card">${playerCard(best, { action: 'none' })}</div>
+            </div>
+            <p>${esc(best.name)} · ${best.ovr} OVR · ${esc(best.clubName)}</p>
+          </div>`
+        : `<div class="ut-reveal">${grid}</div>`,
       actions: `<button class="ut-btn ut-btn-ghost" type="button" data-ut="modal-close">DONE</button>
         <button class="ut-btn ut-btn-primary" type="button" data-ut="pack" data-pack="${result.pack.id}" ${state.coins < result.pack.cost ? 'disabled' : ''}>OPEN ANOTHER · ${coins(result.pack.cost)}</button>`,
     });
+    if (walkout) {
+      walkoutTimer = setTimeout(() => {
+        walkoutTimer = null;
+        const body = modal && modal.querySelector('.ut-modal-body');
+        if (body) body.innerHTML = `<div class="ut-reveal">${grid}</div>`;
+      }, 1700);
+    }
   }
 
   // ── Matches ──────────────────────────────────────────────────────────────
@@ -929,6 +1045,16 @@ export function mountUltimateTeam({ data }) {
       case 'rivals-match':
         startRivals();
         return;
+      case 'buy': {
+        const bought = store.buyMarketPlayer(state, data, button.dataset.key);
+        if (bought.ok) {
+          render();
+          toast(`Signed ${bought.player.name} for ${coins(bought.price)} coins.`);
+        } else {
+          toast(bought.reason === 'coins' ? 'Not enough coins for that player.' : 'That player is no longer available.');
+        }
+        return;
+      }
       case 'claim': {
         const claimed = store.claimObjective(state, button.dataset.id);
         if (claimed.ok) {
@@ -990,6 +1116,9 @@ export function mountUltimateTeam({ data }) {
     if (action === 'picker-search') {
       picker.query = target.value.trim().toLowerCase();
       refreshPickerList();
+    } else if (action === 'market-search') {
+      marketQuery = target.value.trim().toLowerCase();
+      refreshMarketList();
     } else if (action === 'club-search') {
       clubQuery = target.value.trim().toLowerCase();
       const grid = overlay.querySelector('.ut-club-grid');
@@ -1011,6 +1140,18 @@ export function mountUltimateTeam({ data }) {
     const action = target.dataset.ut;
     if (action === 'formation') {
       store.setFormation(state, target.value);
+      render();
+    } else if (action === 'market-pos') {
+      marketPos = target.value;
+      render();
+    } else if (action === 'market-league') {
+      marketLeague = target.value;
+      render();
+    } else if (action === 'market-nation') {
+      marketNation = target.value;
+      render();
+    } else if (action === 'market-sort') {
+      marketSort = target.value;
       render();
     } else if (action === 'picker-pos') {
       picker.pos = target.value;
