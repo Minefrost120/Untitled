@@ -29,6 +29,9 @@ const TAB_ICONS = {
   store: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v12H4z"/><path d="M4 8 6.5 3h11L20 8"/><path d="M12 8v12"/></svg>`,
   battles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z"/><path d="m9 11 2 2 4-4"/></svg>`,
   club: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
+  home: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/></svg>`,
+  rivals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 6 7 6-7"/><path d="m6 13 6 7 6-7"/></svg>`,
+  objectives: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
 };
 
   function playerCard(player, options = {}) {
@@ -58,7 +61,7 @@ export function mountUltimateTeam({ data }) {
   const showcase = createShowcase();
   const state = store.loadState(data);
 
-  let tab = 'squad';
+  let tab = 'home';
   let activeClip = 'Idle';
   let selectedUid = Object.keys(state.squad).map((key) => state.squad[key])[0] || null;
   let pickerIndex = null;
@@ -69,6 +72,7 @@ export function mountUltimateTeam({ data }) {
   let modal = null;
   let matchTimer = null;
   let matchResult = null;
+  let matchMode = 'battles';
   let matchFinished = false;
   let pendingRefresh = false;
   let degradedNoticeShown = false;
@@ -146,6 +150,8 @@ export function mountUltimateTeam({ data }) {
         .map((word) => word[0])
         .join('')
         .toUpperCase() || 'UF';
+    const readyCount = store.objectiveProgress(state).filter((entry) => entry.complete && !entry.claimed).length;
+    const rivalRank = store.RANKS[store.rankForPoints(state.rivals ? state.rivals.points : 0)].name;
 
     overlay.innerHTML = `
       <div class="ut-bg" aria-hidden="true"></div>
@@ -168,10 +174,13 @@ export function mountUltimateTeam({ data }) {
       <div class="ut-shell">
         <nav class="ut-tabs" aria-label="Ultimate Team sections">
           ${[
+            ['home', 'HOME', 'HUB'],
             ['squad', 'SQUAD', `${m.filledCount}/${m.totalSlots}`],
             ['store', 'STORE', 'PACKS'],
             ['battles', 'BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
+            ['rivals', 'RIVALS', rivalRank],
             ['club', 'CLUB', `${state.club.length}`],
+            ['objectives', 'OBJECTIVES', readyCount ? `${readyCount} READY` : 'SEASON'],
           ]
             .map(
               ([id, label, meta]) => `
@@ -182,7 +191,21 @@ export function mountUltimateTeam({ data }) {
             )
             .join('')}
         </nav>
-        <main class="ut-body">${tab === 'squad' ? squadView() : tab === 'store' ? storeView() : tab === 'battles' ? battlesView() : clubView()}</main>
+        <main class="ut-body">${
+          tab === 'home'
+            ? homeView()
+            : tab === 'squad'
+              ? squadView()
+              : tab === 'store'
+                ? storeView()
+                : tab === 'battles'
+                  ? battlesView()
+                  : tab === 'rivals'
+                    ? rivalsView()
+                    : tab === 'objectives'
+                      ? objectivesView()
+                      : clubView()
+        }</main>
       </div>
     `;
 
@@ -359,6 +382,141 @@ export function mountUltimateTeam({ data }) {
     row.innerHTML = buttons
       .map(([clip, label]) => `<button type="button" data-ut="anim" data-clip="${clip}" class="${clip === activeClip ? 'is-active' : ''}">${label}</button>`)
       .join('');
+  }
+
+  // ── Hub ──────────────────────────────────────────────────────────────────
+  function modeTile(id, label, meta, target) {
+    return `<button class="ut-tile" type="button" data-ut="tab" data-tab="${target}">
+      <span class="ut-tile-icon" aria-hidden="true">${TAB_ICONS[id]}</span>
+      <span class="ut-tile-body"><b>${label}</b><small>${esc(meta)}</small></span>
+      <span class="ut-tile-go" aria-hidden="true">→</span>
+    </button>`;
+  }
+
+  function homeView() {
+    const m = metrics();
+    const rivals = state.rivals || { points: 0, wins: 0, draws: 0, losses: 0 };
+    const rank = store.RANKS[store.rankForPoints(rivals.points || 0)];
+    const objectives = store.objectiveProgress(state);
+    const ready = objectives.filter((objective) => objective.complete && !objective.claimed);
+    const next = objectives.find((objective) => !objective.claimed) || objectives[objectives.length - 1];
+    const initials =
+      (state.clubName || 'UF')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word[0])
+        .join('')
+        .toUpperCase() || 'UF';
+    const tiles = [
+      modeTile('squad', 'SQUAD', `${m.filledCount}/${m.totalSlots} players · OVR ${m.rating || '—'}`, 'squad'),
+      modeTile('store', 'STORE', `${store.PACKS.length} packs · ${coins(state.coins)} coins`, 'store'),
+      modeTile('battles', 'SQUAD BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L · ${state.points}/${store.PROMOTION_POINTS} pts`, 'battles'),
+      modeTile('rivals', 'RIVALS', `${rank.name} · ${rivals.points || 0} pts`, 'rivals'),
+      modeTile('club', 'CLUB', `${state.club.length} players signed`, 'club'),
+      modeTile('objectives', 'OBJECTIVES', ready.length ? `${ready.length} ready to claim` : `${objectives.filter((objective) => objective.claimed).length}/${objectives.length} claimed`, 'objectives'),
+    ].join('');
+
+    return `
+      <section class="ut-home">
+        <div class="ut-hero">
+          <div class="ut-hero-main">
+            <small>ULTIMATE TEAM · ${esc(store.divisionName(state.division))}</small>
+            <h2>${esc(state.clubName)}</h2>
+            <p>${state.record.w}W ${state.record.d}D ${state.record.l}L · ${coins(state.coins)} coins</p>
+            <div class="ut-hero-stats">
+              <div><small>SQUAD OVR</small><b>${m.rating || '—'}</b></div>
+              <div><small>CHEMISTRY</small><b>${m.chemistry}</b></div>
+              <div><small>CLUB SIZE</small><b>${state.club.length}</b></div>
+              <div><small>RIVALS</small><b>${rank.name}</b></div>
+            </div>
+            <div class="ut-hero-actions">
+              <button class="ut-btn ut-btn-primary" type="button" data-ut="tab" data-tab="squad">MANAGE SQUAD</button>
+              <button class="ut-btn ut-btn-ghost" type="button" data-ut="tab" data-tab="rivals">PLAY RIVALS</button>
+            </div>
+          </div>
+          <div class="ut-hero-crest" aria-hidden="true"><span>${esc(initials)}</span><small>${rank.name}</small></div>
+        </div>
+        <div class="ut-tiles">${tiles}</div>
+        <div class="ut-home-lower">
+          <div class="ut-feature">
+            <small>NEXT OBJECTIVE</small>
+            <h3>${next ? esc(next.title) : 'All objectives complete'}</h3>
+            <p>${next ? esc(next.detail) : 'More objectives arrive with the next season.'}</p>
+            ${next ? `<div class="ut-obj-bar"><span style="width:${Math.round((next.value / next.goal) * 100)}%"></span></div>
+            <div class="ut-feature-foot"><small>${next.value}/${next.goal} · ${coins(next.reward)} COINS</small>
+            ${next.complete && !next.claimed ? `<button class="ut-btn ut-btn-primary" type="button" data-ut="claim" data-id="${next.id}">CLAIM</button>` : `<button class="ut-btn ut-btn-ghost" type="button" data-ut="tab" data-tab="objectives">VIEW ALL</button>`}</div>` : ''}
+          </div>
+          <div class="ut-home-list">
+            <small>READY TO CLAIM</small>
+            ${ready.length ? ready.slice(0, 3).map((objective) => `<button class="ut-obj-row" type="button" data-ut="claim" data-id="${objective.id}"><b>${esc(objective.title)}</b><span>${coins(objective.reward)}</span></button>`).join('') : '<p class="ut-hint">Nothing to claim yet — open packs and win matches.</p>'}
+          </div>
+        </div>
+      </section>`;
+  }
+
+  function rivalsView() {
+    const m = metrics();
+    const rivals = state.rivals || { points: 0, wins: 0, draws: 0, losses: 0 };
+    const progress = store.rivalProgress(state);
+    const rank = progress.rank;
+    return `
+      <section class="ut-rivals">
+        <header class="ut-section-head">
+          <div><small>RANKED LADDER</small><h2>RIVALS</h2><p>Every result moves your rating. Win to climb, lose and slip back down.</p></div>
+          <div class="ut-record"><b>${rivals.wins || 0}<i>W</i></b><b>${rivals.draws || 0}<i>D</i></b><b>${rivals.losses || 0}<i>L</i></b></div>
+        </header>
+        <div class="ut-rank-card" style="--rank:${rank.color}">
+          <span class="ut-rank-badge">${rank.name}</span>
+          <div class="ut-rank-meter">
+            <small>${progress.points} POINTS${progress.next ? ` · ${Math.max(0, progress.next.min - progress.points)} TO ${progress.next.name}` : ' · TOP RANK'}</small>
+            <div class="ut-chem ut-rank-bar"><span style="width:${Math.round(progress.percent)}%"></span></div>
+          </div>
+          <button class="ut-btn ut-btn-primary" type="button" data-ut="rivals-match" ${m.filledCount < 11 ? 'disabled' : ''}>
+            ${m.filledCount < 11 ? `NEED ${11 - m.filledCount} MORE` : 'PLAY MATCH'}
+          </button>
+        </div>
+        <div class="ut-ladder">
+          ${store.RANKS.map(
+            (entry, index) => `
+            <div class="ut-ladder-row ${index === progress.index ? 'is-current' : ''} ${index < progress.index ? 'is-past' : ''}" style="--rank:${entry.color}">
+              <span class="ut-ladder-dot" aria-hidden="true"></span>
+              <b>${entry.name}</b>
+              <small>${entry.min}+ PTS</small>
+              <span class="ut-ladder-reward">${coins(entry.reward)} COINS</span>
+            </div>`,
+          ).join('')}
+        </div>
+        <p class="ut-hint">Win <b>+45</b>, draw <b>+12</b>, loss <b>-22</b> rating. Rank-ups pay a one-off coin bonus.</p>
+      </section>`;
+  }
+
+  function objectivesView() {
+    const list = store.objectiveProgress(state);
+    const ready = list.filter((objective) => objective.complete && !objective.claimed).length;
+    return `
+      <section class="ut-objectives">
+        <header class="ut-section-head">
+          <div><small>SEASON PROGRESS</small><h2>OBJECTIVES</h2><p>Complete goals as you build your club, then claim the coin rewards.</p></div>
+          <div class="ut-wallet"><span aria-hidden="true">◉</span><b>${ready}</b><small>READY</small></div>
+        </header>
+        <div class="ut-obj-list">
+          ${list
+            .map(
+              (objective) => `
+            <article class="ut-obj ${objective.complete ? 'is-complete' : ''} ${objective.claimed ? 'is-claimed' : ''}">
+              <div class="ut-obj-head"><b>${esc(objective.title)}</b><small>${coins(objective.reward)} COINS</small></div>
+              <p>${esc(objective.detail)}</p>
+              <div class="ut-obj-bar"><span style="width:${Math.round((objective.value / objective.goal) * 100)}%"></span></div>
+              <div class="ut-obj-foot">
+                <small>${objective.value}/${objective.goal}</small>
+                ${objective.claimed ? '<span class="ut-obj-state">CLAIMED</span>' : objective.complete ? `<button class="ut-btn ut-btn-primary" type="button" data-ut="claim" data-id="${objective.id}">CLAIM</button>` : '<span class="ut-obj-state">IN PROGRESS</span>'}
+              </div>
+            </article>`,
+            )
+            .join('')}
+        </div>
+      </section>`;
   }
 
   // ── Store ────────────────────────────────────────────────────────────────
@@ -542,13 +700,26 @@ export function mountUltimateTeam({ data }) {
   function startBattle(opponentId) {
     const opponent = store.OPPONENTS.find((entry) => entry.id === opponentId);
     if (!opponent) return;
-    const result = store.simulateMatch(state, opponent);
+    beginMatch(opponent, store.simulateMatch(state, opponent), 'battles');
+  }
+
+  function startRivals() {
+    if (metrics().filledCount < 11) {
+      toast('Fill your XI before playing Rivals.');
+      return;
+    }
+    const result = store.simulateRivals(state);
+    beginMatch(result.opponent, result, 'rivals');
+  }
+
+  function beginMatch(opponent, result, mode) {
+    matchMode = mode;
     matchResult = result;
     matchFinished = false;
 
     openModal({
       title: `${state.clubName} vs ${opponent.name}`,
-      subtitle: 'SQUAD BATTLE · LIVE',
+      subtitle: mode === 'rivals' ? 'RIVALS · RANKED' : 'SQUAD BATTLE · LIVE',
       wide: true,
       body: `
         <div class="ut-match">
@@ -604,11 +775,14 @@ export function mountUltimateTeam({ data }) {
     if (!matchResult || matchFinished) return;
     matchFinished = true;
     const result = matchResult;
-    const { promoted } = store.applyResult(state, {
-      ...result,
-      coins: result.coins,
-      points: result.points,
-    });
+    let bonusText = '';
+    if (matchMode === 'rivals') {
+      const applied = store.applyRivalsResult(state, result);
+      if (applied.rankedUp) bonusText = ` · ${store.RANKS[applied.rank].name} RANK · +${coins(applied.reward)} BONUS`;
+    } else {
+      const { promoted } = store.applyResult(state, result);
+      if (promoted) bonusText = ' · PROMOTED';
+    }
     const label = result.outcome === 'win' ? 'WIN' : result.outcome === 'draw' ? 'DRAW' : 'LOSS';
     if (modal) {
       const body = modal.querySelector('.ut-modal-body');
@@ -618,7 +792,7 @@ export function mountUltimateTeam({ data }) {
           `<div class="ut-match-result is-${result.outcome}">
             <small>FULL TIME</small>
             <h4>${label} · ${result.goalsFor} – ${result.goalsAgainst}</h4>
-            <p>+${coins(result.coins)} coins${result.points ? ` · +${result.points} pts` : ''}${promoted ? ' · PROMOTED' : ''}</p>
+            <p>+${coins(result.coins)} coins${matchMode === 'battles' && result.points ? ` · +${result.points} pts` : ''}${bonusText}</p>
           </div>`,
         );
       }
@@ -752,6 +926,19 @@ export function mountUltimateTeam({ data }) {
       case 'battle':
         startBattle(button.dataset.opp);
         return;
+      case 'rivals-match':
+        startRivals();
+        return;
+      case 'claim': {
+        const claimed = store.claimObjective(state, button.dataset.id);
+        if (claimed.ok) {
+          render();
+          toast(`Objective reward: +${coins(claimed.reward)} coins.`);
+        } else {
+          toast('That objective is not ready to claim.');
+        }
+        return;
+      }
       case 'skip-match':
         if (matchTimer) {
           clearInterval(matchTimer);

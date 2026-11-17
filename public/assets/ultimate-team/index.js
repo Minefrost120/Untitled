@@ -25,7 +25,7 @@ function unlockNav() {
     card.type = 'button';
     card.dataset.card = 'ultimate';
     card.innerHTML = `<span class="uf-card-art ut-launch-art" aria-hidden="true"><i></i></span>
-      <span class="uf-card-body"><small>BUILD</small><b>ULTIMATE TEAM</b><em>Packs · squad building · Squad Battles</em></span>
+      <span class="uf-card-body"><small>BUILD</small><b>ULTIMATE TEAM</b><em>Packs · Rivals · objectives · Squad Battles</em></span>
       <span class="uf-card-go" aria-hidden="true">→</span>`;
     cards.appendChild(card);
   }

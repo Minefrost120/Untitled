@@ -19,6 +19,22 @@ export const OPPONENTS = [
   { id: 'riverton', name: 'Riverton FC', short: 'RIV', rating: 86, color: '#ff3b4d', reward: 2.7 },
 ];
 
+export const RANKS = [
+  { id: 'bronze', name: 'BRONZE', min: 0, reward: 600, color: '#c98a4b' },
+  { id: 'silver', name: 'SILVER', min: 400, reward: 1100, color: '#c9d4dd' },
+  { id: 'gold', name: 'GOLD', min: 950, reward: 1800, color: '#ffd166' },
+  { id: 'elite', name: 'ELITE', min: 1650, reward: 2600, color: '#a15cff' },
+  { id: 'ultimate', name: 'ULTIMATE', min: 2500, reward: 4000, color: '#4fe3ff' },
+];
+
+export const OBJECTIVES = [
+  { id: 'first-pack', title: 'Open your first pack', detail: 'Sign players from any pack in the store.', goal: 1, metric: 'packs', reward: 500 },
+  { id: 'club-25', title: 'Build a club of 25', detail: 'Grow your collection to 25 players.', goal: 25, metric: 'club', reward: 750 },
+  { id: 'rating-78', title: 'Reach a 78 rated XI', detail: 'Improve your starting eleven rating.', goal: 78, metric: 'rating', reward: 1200 },
+  { id: 'wins-3', title: 'Win 3 matches', detail: 'Squad Battles and Rivals wins both count.', goal: 3, metric: 'wins', reward: 1500 },
+  { id: 'rivals-5', title: 'Win 5 Rivals matches', detail: 'Climb the ranked ladder.', goal: 5, metric: 'rivalsWins', reward: 2500 },
+];
+
 let uidCounter = 0;
 function nextUid() {
   uidCounter += 1;
@@ -83,6 +99,8 @@ export function freshState(data) {
     bench,
     club,
     packsOpened: 0,
+    rivals: { points: 0, wins: 0, draws: 0, losses: 0, rank: 0, best: 0 },
+    objectivesClaimed: [],
   };
 }
 
@@ -101,6 +119,10 @@ export function loadState(data) {
     parsed.coins = Number(parsed.coins) || 0;
     parsed.division = clamp(Number(parsed.division) || 5, 1, 5);
     parsed.points = Number(parsed.points) || 0;
+    parsed.rivals = { points: 0, wins: 0, draws: 0, losses: 0, rank: 0, best: 0, ...(parsed.rivals || {}) };
+    parsed.rivals.points = Number(parsed.rivals.points) || 0;
+    parsed.rivals.rank = rankForPoints(parsed.rivals.points);
+    parsed.objectivesClaimed = Array.isArray(parsed.objectivesClaimed) ? parsed.objectivesClaimed : [];
     return parsed;
   } catch {
     return freshState(data);
@@ -393,6 +415,103 @@ export function applyResult(state, result) {
   }
   saveState(state);
   return { promoted };
+}
+
+// ── Rivals ────────────────────────────────────────────────────────────────
+export function rankForPoints(points) {
+  let index = 0;
+  RANKS.forEach((rank, position) => {
+    if (points >= rank.min) index = position;
+  });
+  return index;
+}
+
+export function rivalsOpponent(state) {
+  const rivals = state.rivals || {};
+  const rank = clamp(Number(rivals.rank) || 0, 0, RANKS.length - 1);
+  const names = ['Riverside Athletic', 'Kingsmeadow', 'Vulcan FC', 'Olympic Nord', 'Meridian United'];
+  const name = names[rank % names.length];
+  return {
+    id: `rivals-${rank}`,
+    name,
+    short: name.slice(0, 3).toUpperCase(),
+    rating: clamp(64 + rank * 6 + randomInt(-2, 3), 60, 95),
+    color: RANKS[rank].color,
+    reward: 1.2 + rank * 0.35,
+  };
+}
+
+export function simulateRivals(state) {
+  const opponent = rivalsOpponent(state);
+  const result = simulateMatch(state, opponent);
+  result.mode = 'rivals';
+  return result;
+}
+
+// Rivals uses its own ladder: results move rating instead of promotion points.
+export function applyRivalsResult(state, result) {
+  const rivals = state.rivals;
+  rivals.wins = Number(rivals.wins) || 0;
+  rivals.draws = Number(rivals.draws) || 0;
+  rivals.losses = Number(rivals.losses) || 0;
+  if (result.outcome === 'win') rivals.wins += 1;
+  else if (result.outcome === 'draw') rivals.draws += 1;
+  else rivals.losses += 1;
+
+  const before = rankForPoints(rivals.points || 0);
+  const delta = result.outcome === 'win' ? 45 : result.outcome === 'draw' ? 12 : -22;
+  rivals.points = Math.max(0, (Number(rivals.points) || 0) + delta);
+  const after = rankForPoints(rivals.points);
+  rivals.rank = after;
+  rivals.best = Math.max(Number(rivals.best) || 0, after);
+
+  const rankedUp = after > before;
+  const reward = rankedUp ? RANKS[after].reward : 0;
+  state.coins += result.coins + reward;
+  saveState(state);
+  return { rankedUp, rank: after, reward };
+}
+
+export function rivalProgress(state) {
+  const rivals = state.rivals || { points: 0, rank: 0 };
+  const index = rankForPoints(rivals.points || 0);
+  const rank = RANKS[index];
+  const next = RANKS[index + 1] || null;
+  const span = next ? next.min - rank.min : 1;
+  const percent = next ? clamp((((rivals.points || 0) - rank.min) / span) * 100, 0, 100) : 100;
+  return { rank, next, percent, points: rivals.points || 0, index };
+}
+
+// ── Objectives ────────────────────────────────────────────────────────────
+export function objectiveProgress(state) {
+  const metrics = squadMetrics(state);
+  const rivals = state.rivals || {};
+  const values = {
+    packs: state.packsOpened || 0,
+    club: state.club.length,
+    rating: metrics.rating,
+    wins: (state.record.w || 0) + (rivals.wins || 0),
+    rivalsWins: rivals.wins || 0,
+  };
+  const claimed = new Set(state.objectivesClaimed || []);
+  return OBJECTIVES.map((objective) => {
+    const raw = values[objective.metric] || 0;
+    return {
+      ...objective,
+      value: Math.min(raw, objective.goal),
+      complete: raw >= objective.goal,
+      claimed: claimed.has(objective.id),
+    };
+  });
+}
+
+export function claimObjective(state, id) {
+  const objective = objectiveProgress(state).find((entry) => entry.id === id);
+  if (!objective || !objective.complete || objective.claimed) return { ok: false };
+  state.coins += objective.reward;
+  state.objectivesClaimed = [...(state.objectivesClaimed || []), id];
+  saveState(state);
+  return { ok: true, reward: objective.reward, objective };
 }
 
 export function divisionName(division) {
