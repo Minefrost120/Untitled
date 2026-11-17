@@ -15,6 +15,16 @@ const shortName = (player, max = 13) => {
 };
 const ovrTone = (ovr) => (ovr >= 85 ? 'elite' : ovr >= 78 ? 'gold' : ovr >= 68 ? 'silver' : 'bronze');
 const RARITY_LABEL = { elite: 'ICON', gold: 'GOLD', silver: 'SILVER', bronze: 'BRONZE' };
+// Touch devices have no hover and a double tap can zoom, so a single tap has
+// to arm the swap; desktop keeps the inspect-first, tap-again behaviour.
+const touchSwap = (() => {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints || 0) > 0;
+  } catch {
+    return false;
+  }
+})();
+
 const difficultyStars = (rating) => {
   const filled = rating >= 86 ? 5 : rating >= 80 ? 4 : 3;
   return '\u2605'.repeat(filled) + '\u2606'.repeat(5 - filled);
@@ -1081,9 +1091,9 @@ export function mountUltimateTeam({ data }) {
           const repeatTap = lastTapUid === uid;
           lastTapUid = uid;
           selectedUid = uid;
-          if (repeatTap && tab === 'squad') {
+          if ((repeatTap || touchSwap) && tab === 'squad') {
             moveUid = uid;
-            toast('Tap another player to swap.');
+            toast('Tap another player or slot to swap.');
           }
           if (tab === 'squad') render();
         } else {
@@ -1106,9 +1116,9 @@ export function mountUltimateTeam({ data }) {
         const repeatTap = lastTapUid === uid;
         lastTapUid = uid;
         selectedUid = uid;
-        if (repeatTap) {
+        if (repeatTap || touchSwap) {
           moveUid = uid;
-          toast('Tap another player to swap.');
+          toast('Tap another player or slot to swap.');
         }
         render();
         return;
@@ -1145,7 +1155,7 @@ export function mountUltimateTeam({ data }) {
         lastTapUid = uid;
         closeModal();
         render();
-        toast('Tap another player to swap.');
+        toast('Tap another player or slot to swap.');
         return;
       }
       case 'anim':
