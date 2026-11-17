@@ -66,6 +66,7 @@ export function mountUltimateTeam({ data }) {
   let activeClip = 'Idle';
   let selectedUid = Object.keys(state.squad).map((key) => state.squad[key])[0] || null;
   let moveUid = null;
+  let lastTapUid = null;
   let pickerIndex = null;
   let clubQuery = '';
   let clubSort = 'ovr';
@@ -372,6 +373,8 @@ export function mountUltimateTeam({ data }) {
   }
 
   function detailMarkup(player) {
+    const inXI = Object.values(state.squad).includes(player.uid);
+    const inBench = state.bench.includes(player.uid);
     const attrs = [
       ['PACE', player.attrs.pace],
       ['SHOOT', player.attrs.shoot],
@@ -400,6 +403,7 @@ export function mountUltimateTeam({ data }) {
             .join('')}
         </div>
         <div class="ut-detail-actions">
+          ${inXI || inBench ? `<button class="ut-btn ut-btn-primary" type="button" data-ut="arm-move" data-uid="${esc(player.uid)}">SWAP</button>` : ''}
           <button class="ut-btn ut-btn-ghost" type="button" data-ut="move-bench" data-uid="${esc(player.uid)}">MOVE TO BENCH</button>
           <button class="ut-btn ut-btn-danger" type="button" data-ut="release" data-uid="${esc(player.uid)}">RELEASE</button>
         </div>
@@ -992,6 +996,7 @@ export function mountUltimateTeam({ data }) {
       store.swapPlayers(state, uid, target.dataset.uid);
     }
     selectedUid = uid;
+    lastTapUid = null;
     render();
     toast('Players swapped.');
   }
@@ -1051,6 +1056,8 @@ export function mountUltimateTeam({ data }) {
       case 'tab':
         closeModal();
         tab = button.dataset.tab;
+        moveUid = null;
+        lastTapUid = null;
         render();
         return;
       case 'autofill':
@@ -1071,8 +1078,13 @@ export function mountUltimateTeam({ data }) {
           return;
         }
         if (uid) {
+          const repeatTap = lastTapUid === uid;
+          lastTapUid = uid;
           selectedUid = uid;
-          moveUid = uid;
+          if (repeatTap && tab === 'squad') {
+            moveUid = uid;
+            toast('Tap another player to swap.');
+          }
           if (tab === 'squad') render();
         } else {
           openPicker(index);
@@ -1085,8 +1097,19 @@ export function mountUltimateTeam({ data }) {
           moveToTarget(button);
           return;
         }
+        if (moveUid === uid) {
+          moveUid = null;
+          lastTapUid = null;
+          render();
+          return;
+        }
+        const repeatTap = lastTapUid === uid;
+        lastTapUid = uid;
         selectedUid = uid;
-        moveUid = moveUid === uid ? null : uid;
+        if (repeatTap) {
+          moveUid = uid;
+          toast('Tap another player to swap.');
+        }
         render();
         return;
       }
@@ -1106,8 +1129,25 @@ export function mountUltimateTeam({ data }) {
       }
       case 'cancel-move':
         moveUid = null;
+        lastTapUid = null;
         render();
         return;
+      case 'arm-move': {
+        const uid = button.dataset.uid;
+        const inXI = Object.values(state.squad).includes(uid);
+        const inBench = state.bench.includes(uid);
+        if (!uid || (!inXI && !inBench)) {
+          toast('Pick a squad player to swap.');
+          return;
+        }
+        selectedUid = uid;
+        moveUid = uid;
+        lastTapUid = uid;
+        closeModal();
+        render();
+        toast('Tap another player to swap.');
+        return;
+      }
       case 'anim':
         activeClip = button.dataset.clip;
         showcase.play(activeClip);
