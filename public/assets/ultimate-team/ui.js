@@ -2,6 +2,7 @@
 import { FORMATIONS, FORMATION_IDS, positionAffinity } from './data.js';
 import * as store from './store.js';
 import { createShowcase } from './showcase.js';
+import * as career from './career.js';
 
 const esc = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -43,6 +44,7 @@ const TAB_ICONS = {
   home: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/></svg>`,
   rivals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 6 7 6-7"/><path d="m6 13 6 7 6-7"/></svg>`,
   objectives: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
+  career: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/><path d="m17 3 1.6 3.4L22 7l-3.4 1.6L17 12l-1.6-3.4L12 7l3.4-.6L17 3Z"/></svg>`,
 };
 
   function playerCard(player, options = {}) {
@@ -81,6 +83,9 @@ export function mountUltimateTeam({ data }) {
   let clubQuery = '';
   let clubSort = 'ovr';
   const picker = { query: '', pos: 'ALL', league: 'ALL' };
+  let careerState = career.loadCareer();
+  let careerClubs = null;
+  const careerForm = { name: '', pos: 'ST', leagueId: '', clubId: '' };
   let marketQuery = '';
   let marketPos = 'ALL';
   let marketLeague = 'ALL';
@@ -219,6 +224,7 @@ export function mountUltimateTeam({ data }) {
             ['battles', 'BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L`],
             ['rivals', 'RIVALS', rivalRank],
             ['club', 'CLUB', `${state.club.length}`],
+            ['career', 'CAREER', careerState ? (careerState.manager ? 'MANAGER' : `SEASON ${careerState.season}`) : 'NEW PRO'],
             ['objectives', 'OBJECTIVES', readyCount ? `${readyCount} READY` : 'SEASON'],
           ]
             .map(
@@ -243,8 +249,10 @@ export function mountUltimateTeam({ data }) {
                   ? battlesView()
                   : tab === 'rivals'
                     ? rivalsView()
-                    : tab === 'objectives'
-                      ? objectivesView()
+                    : tab === 'career'
+                      ? careerView()
+                      : tab === 'objectives'
+                        ? objectivesView()
                       : clubView()
         }</main>
       </div>
@@ -329,7 +337,8 @@ export function mountUltimateTeam({ data }) {
                 ${FORMATION_IDS.map((id) => `<option value="${id}" ${state.formation === id ? 'selected' : ''}>${FORMATIONS[id].name}</option>`).join('')}
               </select>
             </label>
-            <button class="ut-btn ut-btn-primary" type="button" data-ut="autofill">AUTO FILL</button>
+            <button class="ut-btn ut-btn-ghost" type="button" data-ut="autofill">AUTO FILL</button>
+            <button class="ut-btn ut-btn-primary" type="button" data-ut="best-xi">BEST XI</button>
           </div>
 
           ${moveUid ? `<div class="ut-move-hint"><b>${esc(shortName(store.findPlayer(state, moveUid)))}</b> selected — tap another player or slot to swap<button class="ut-btn ut-btn-ghost" type="button" data-ut="cancel-move">CANCEL</button></div>` : ''}
@@ -461,6 +470,7 @@ export function mountUltimateTeam({ data }) {
       modeTile('battles', 'SQUAD BATTLES', `${state.record.w}W ${state.record.d}D ${state.record.l}L · ${state.points}/${store.PROMOTION_POINTS} pts`, 'battles'),
       modeTile('rivals', 'RIVALS', `${rank.name} · ${rivals.points || 0} pts`, 'rivals'),
       modeTile('club', 'CLUB', `${state.club.length} players signed`, 'club'),
+      modeTile('career', 'CAREER', careerState ? (careerState.manager ? `${careerState.name} · manager` : `${careerState.name} · ${careerState.clubName}`) : 'Create your pro', 'career'),
       modeTile('objectives', 'OBJECTIVES', ready.length ? `${ready.length} ready to claim` : `${objectives.filter((objective) => objective.claimed).length}/${objectives.length} claimed`, 'objectives'),
     ].join('');
 
@@ -564,6 +574,158 @@ export function mountUltimateTeam({ data }) {
             .join('')}
         </div>
       </section>`;
+  }
+
+  // ── Career ───────────────────────────────────────────────────────────────
+  function careerLeagues() {
+    const all = Object.entries(data.leagues || {}).map(([id, league]) => ({ id, name: league.name }));
+    if (all.length) return all.sort((a, b) => a.name.localeCompare(b.name));
+    return data.leaguesInPool && data.leaguesInPool.length ? data.leaguesInPool : [];
+  }
+
+  function careerClubList() {
+    if (!careerClubs) careerClubs = career.clubOptions(data);
+    if (!careerForm.leagueId) {
+      const first = careerLeagues()[0];
+      careerForm.leagueId = first ? first.id : '';
+    }
+    return careerClubs.filter((club) => !careerForm.leagueId || club.leagueId === careerForm.leagueId);
+  }
+
+  function careerCreateView() {
+    const leagues = careerLeagues();
+    const clubs = careerClubList();
+    if (!careerForm.clubId && clubs[0]) careerForm.clubId = clubs[0].id;
+    return `
+      <section class="ut-career">
+        <header class="ut-section-head">
+          <div><small>NEW PRO</small><h2>CAREER</h2><p>Create a player, play August to a May finale with the cup final in April, and retire into management once you turn 30.</p></div>
+        </header>
+        <div class="ut-career-create">
+          <label class="ut-field"><small>PLAYER NAME</small><input class="ut-input" data-ut="career-name" maxlength="24" placeholder="Your pro" value="${esc(careerForm.name)}"></label>
+          <label class="ut-field"><small>POSITION</small><select class="ut-input" data-ut="career-pos">${career.POSITIONS.map((pos) => `<option value="${pos}" ${careerForm.pos === pos ? 'selected' : ''}>${pos}</option>`).join('')}</select></label>
+          <label class="ut-field"><small>LEAGUE</small><select class="ut-input" data-ut="career-league">${leagues.map((league) => `<option value="${esc(league.id)}" ${careerForm.leagueId === league.id ? 'selected' : ''}>${esc(league.name)}</option>`).join('')}</select></label>
+          <label class="ut-field"><small>CLUB</small><select class="ut-input" data-ut="career-club">${clubs.map((club) => `<option value="${esc(club.id)}" ${careerForm.clubId === club.id ? 'selected' : ''}>${esc(club.name)} · ${club.rating} OVR</option>`).join('')}</select></label>
+          <button class="ut-btn ut-btn-primary" type="button" data-ut="career-start">START CAREER</button>
+        </div>
+        <p class="ut-hint">Every club and league in the game's database is available — ${careerClubs ? careerClubs.length.toLocaleString('en-GB') : '1,700+'} clubs across ${leagues.length} leagues.</p>
+      </section>`;
+  }
+
+  function careerCalendar(state) {
+    return `<div class="ut-calendar">
+      ${career
+        .monthsFor(state)
+        .map(
+          ({ month, fixtures }) => `
+        <div class="ut-month">
+          <header><b>${month}</b><small>${fixtures.filter((fixture) => fixture.played).length}/${fixtures.length}</small></header>
+          ${fixtures
+            .map(
+              (fixture) => `
+            <div class="ut-fixture-row ${fixture.competition === 'CUP' ? 'is-cup' : ''}">
+              <span class="ut-fixture-outcome is-${fixture.played ? fixture.result.outcome : 'none'}">${fixture.played ? (fixture.result.outcome === 'win' ? 'W' : fixture.result.outcome === 'draw' ? 'D' : 'L') : '·'}</span>
+              <b>${esc(fixture.opponent.name)}</b>
+              <small>${fixture.played ? `${fixture.result.goalsFor}–${fixture.result.goalsAgainst}` : esc(fixture.label)}</small>
+            </div>`,
+            )
+            .join('')}
+        </div>`,
+        )
+        .join('')}
+    </div>`;
+  }
+
+  function careerPlayerView() {
+    const state2 = careerState;
+    const fixture = career.nextFixture(state2);
+    const months = career.monthsFor(state2);
+    return `
+      <section class="ut-career">
+        <header class="ut-section-head">
+          <div><small>${esc(state2.clubName)} · ${esc(state2.leagueName)}</small><h2>${esc(state2.name)}</h2>
+            <p>${esc(state2.pos)} · ${state2.age} years old · season ${state2.season} · ${esc(career.currentMonth(state2))}</p></div>
+          <div class="ut-career-badge"><b>${state2.ovr}</b><small>OVR</small></div>
+        </header>
+        <div class="ut-career-grid">
+          <div class="ut-fixture">
+            <small>${fixture ? `${fixture.competition} · ${esc(fixture.label)}` : 'SEASON COMPLETE'}</small>
+            ${fixture ? `<h3>${esc(state2.clubName)} ${fixture.home ? 'vs' : 'at'} ${esc(fixture.opponent.name)}</h3>
+              <p>${esc(fixture.month)} · opponent rated ${fixture.opponent.rating}</p>
+              <div class="ut-star"><small>DANGER MAN</small><b>${esc(fixture.star.name)}</b><span>${fixture.star.ovr} OVR${fixture.star.wonderkid ? ' · WONDERKID' : fixture.star.elite ? ' · ELITE' : ''}</span></div>
+              <button class="ut-btn ut-btn-primary" type="button" data-ut="career-play">PLAY NEXT MATCH</button>` : `<p class="ut-hint">The season is complete.</p>`}
+          </div>
+          <div class="ut-career-stats">
+            <div><small>APPS</small><b>${state2.stats.apps}</b></div>
+            <div><small>GOALS</small><b>${state2.stats.goals}</b></div>
+            <div><small>ASSISTS</small><b>${state2.stats.assists}</b></div>
+            <div><small>AVG RATING</small><b>${career.averageRating(state2.stats)}</b></div>
+            <div><small>TROPHIES</small><b>${state2.trophies}</b></div>
+            <div><small>POINTS</small><b>${state2.points}</b></div>
+          </div>
+        </div>
+        <div class="ut-career-actions">
+          <button class="ut-btn ut-btn-ghost" type="button" data-ut="career-retire" ${state2.age < 30 ? 'disabled title="You can retire at 30 or later"' : ''}>RETIRE (${state2.age})</button>
+          <span class="ut-hint">${state2.age < 30 ? `Retirement unlocks in ${30 - state2.age} season${30 - state2.age === 1 ? '' : 's'}.` : 'Retiring turns this save into your management career.'}</span>
+        </div>
+        ${careerCalendar(state2)}
+      </section>`;
+  }
+
+  function careerManagerView() {
+    const state2 = careerState;
+    const fixture = career.nextFixture(state2);
+    const record = state2.managerRecord || { w: 0, d: 0, l: 0, seasons: 0 };
+    const totals = state2.managerTotals || {};
+    return `
+      <section class="ut-career">
+        <header class="ut-section-head">
+          <div><small>MANAGER · ${esc(state2.clubName)}</small><h2>${esc(state2.name)}</h2>
+            <p>Retired at ${state2.age} · ${totals.apps || 0} appearances, ${totals.goals || 0} goals, ${totals.trophies || 0} trophies as a player</p></div>
+          <div class="ut-career-badge"><b>${record.w + record.d + record.l}</b><small>GAMES</small></div>
+        </header>
+        <div class="ut-career-grid">
+          <div class="ut-fixture">
+            <small>${fixture ? `${fixture.competition} · ${esc(fixture.label)}` : 'SEASON COMPLETE'}</small>
+            ${fixture ? `<h3>${esc(state2.clubName)} ${fixture.home ? 'vs' : 'at'} ${esc(fixture.opponent.name)}</h3><p>${esc(fixture.month)} · season ${state2.season}</p><button class="ut-btn ut-btn-primary" type="button" data-ut="career-play">PLAY MATCH</button>` : `<button class="ut-btn ut-btn-primary" type="button" data-ut="career-play">START NEXT SEASON</button>`}
+          </div>
+          <div class="ut-career-stats">
+            <div><small>WINS</small><b>${record.w}</b></div>
+            <div><small>DRAWS</small><b>${record.d}</b></div>
+            <div><small>LOSSES</small><b>${record.l}</b></div>
+            <div><small>POINTS</small><b>${state2.points}</b></div>
+            <div><small>SEASONS</small><b>${record.seasons}</b></div>
+            <div><small>LAST FINISH</small><b>${state2.lastManagerFinish || '—'}</b></div>
+          </div>
+        </div>
+        ${careerCalendar(state2)}
+      </section>`;
+  }
+
+  function careerView() {
+    if (!careerState) return careerCreateView();
+    return careerState.manager ? careerManagerView() : careerPlayerView();
+  }
+
+  function openCareerResult(outcome) {
+    if (!outcome.fixture) {
+      render();
+      return;
+    }
+    const { fixture, result, seasonEnded, summary } = outcome;
+    const manager = careerState.manager;
+    openModal({
+      title: `${careerState.clubName} ${result.goalsFor}–${result.goalsAgainst} ${fixture.opponent.name}`,
+      subtitle: `${fixture.competition} · ${fixture.label}`,
+      body: `<div class="ut-match-result is-${result.outcome}">
+        <small>FULL TIME · ${esc(fixture.month)}</small>
+        <h4>${result.outcome.toUpperCase()} · ${result.goalsFor} – ${result.goalsAgainst}</h4>
+        ${manager ? '<p>Your first-team result as manager.</p>' : `<p>${esc(careerState.name)} · ${result.playerRating.toFixed(1)} rating${result.playerGoals ? ` · ${result.playerGoals} goal${result.playerGoals === 1 ? '' : 's'}` : ''}${result.playerAssists ? ` · ${result.playerAssists} assist${result.playerAssists === 1 ? '' : 's'}` : ''}</p>`}
+        <p class="ut-hint">Danger man ${esc(fixture.star.name)} (${fixture.star.ovr}) scored ${result.starGoals}.</p>
+        ${seasonEnded && summary ? `<div class="ut-season-end"><small>SEASON ${summary.season} COMPLETE</small><h4>${summary.points} POINTS${summary.champion ? ' · CHAMPIONS' : ''}</h4><p>${summary.apps} apps · ${summary.goals} goals · ${summary.assists} assists</p></div>` : ''}
+      </div>`,
+      actions: `<button class="ut-btn ut-btn-primary" type="button" data-ut="career-result-close">CONTINUE</button>`,
+    });
   }
 
   // ── Market ───────────────────────────────────────────────────────────────
@@ -1075,6 +1237,70 @@ export function mountUltimateTeam({ data }) {
         render();
         toast('Best available players moved into the XI.');
         return;
+      case 'best-xi':
+        store.bestXI(state);
+        render();
+        toast('Strongest XI selected by position and rating.');
+        return;
+      case 'career-start': {
+        const nameEl = overlay.querySelector('[data-ut="career-name"]');
+        const posEl = overlay.querySelector('[data-ut="career-pos"]');
+        const clubEl = overlay.querySelector('[data-ut="career-club"]');
+        const created = career.createCareer(data, {
+          name: nameEl ? nameEl.value : careerForm.name,
+          pos: posEl ? posEl.value : careerForm.pos,
+          clubId: clubEl ? clubEl.value : careerForm.clubId,
+        });
+        if (!created) {
+          toast('Pick a club to start your career.');
+          return;
+        }
+        careerState = created;
+        render();
+        toast(`Career started at ${created.clubName}.`);
+        return;
+      }
+      case 'career-play': {
+        if (!careerState) return;
+        const outcome = career.playNext(careerState, data);
+        if (!outcome.ok) {
+          toast('That career cannot continue.');
+          return;
+        }
+        render();
+        openCareerResult(outcome);
+        return;
+      }
+      case 'career-result-close':
+        closeModal();
+        render();
+        return;
+      case 'career-retire': {
+        if (!careerState) return;
+        if (careerState.age < 30) {
+          toast(`You can retire at 30. ${30 - careerState.age} season${30 - careerState.age === 1 ? '' : 's'} to go.`);
+          return;
+        }
+        openModal({
+          title: 'Retire and become manager?',
+          subtitle: 'CAREER',
+          body: `<p class="ut-hint">Your playing career ends at ${careerState.age}. The same save continues with you in the dugout at ${esc(careerState.clubName)}, and your player record stays on the manager screen.</p>`,
+          actions: `<button class="ut-btn ut-btn-ghost" type="button" data-ut="modal-close">KEEP PLAYING</button>
+            <button class="ut-btn ut-btn-primary" type="button" data-ut="career-retire-confirm">RETIRE</button>`,
+        });
+        return;
+      }
+      case 'career-retire-confirm': {
+        const result = career.retire(careerState, data);
+        closeModal();
+        if (result.ok) {
+          render();
+          toast('Retired — you are now the manager.');
+        } else if (result.reason === 'age') {
+          toast('You can only retire at 30 or later.');
+        }
+        return;
+      }
       case 'slot': {
         const index = Number(button.dataset.slot);
         const uid = state.squad[index];
@@ -1276,6 +1502,8 @@ export function mountUltimateTeam({ data }) {
     if (action === 'picker-search') {
       picker.query = target.value.trim().toLowerCase();
       refreshPickerList();
+    } else if (action === 'career-name') {
+      careerForm.name = target.value;
     } else if (action === 'market-search') {
       marketQuery = target.value.trim().toLowerCase();
       refreshMarketList();
@@ -1301,6 +1529,14 @@ export function mountUltimateTeam({ data }) {
     if (action === 'formation') {
       store.setFormation(state, target.value);
       render();
+    } else if (action === 'career-league') {
+      careerForm.leagueId = target.value;
+      careerForm.clubId = '';
+      render();
+    } else if (action === 'career-pos') {
+      careerForm.pos = target.value;
+    } else if (action === 'career-club') {
+      careerForm.clubId = target.value;
     } else if (action === 'market-pos') {
       marketPos = target.value;
       render();
@@ -1382,5 +1618,5 @@ export function mountUltimateTeam({ data }) {
 
   window.addEventListener('keydown', onKeyDown, true);
 
-  return { open, close, isOpen, state, data };
+  return { open, close, isOpen, state, data, getCareer: () => careerState };
 }

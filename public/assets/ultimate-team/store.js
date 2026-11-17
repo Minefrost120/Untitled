@@ -318,6 +318,38 @@ export function moveToBench(state, index, uid) {
   return state;
 }
 
+// Strongest legal XI: exact position first, then rating, across all 11 slots.
+export function bestXI(state) {
+  const slots = FORMATIONS[state.formation].slots;
+  const used = new Set();
+  const squad = {};
+  slots.forEach((slot, index) => {
+    let best = null;
+    let bestScore = -Infinity;
+    state.club.forEach((player) => {
+      if (used.has(player.uid)) return;
+      const affinity = positionAffinity(slot.pos, player.pos);
+      const score = affinity * 100 + player.ovr + (player.pos === slot.pos ? 25 : 0);
+      if (score > bestScore) {
+        bestScore = score;
+        best = player;
+      }
+    });
+    if (best) {
+      squad[index] = best.uid;
+      used.add(best.uid);
+    }
+  });
+  state.squad = squad;
+  state.bench = state.club
+    .filter((player) => !used.has(player.uid))
+    .sort((a, b) => b.ovr - a.ovr)
+    .slice(0, BENCH_SIZE)
+    .map((player) => player.uid);
+  saveState(state);
+  return state;
+}
+
 export function autoFill(state) {
   const metrics = squadMetrics(state);
   const used = new Set(Object.values(state.squad));
