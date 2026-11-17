@@ -49,9 +49,23 @@ function hideBoot() {
 
 function showBootError(error) {
   if (!bootOverlay) return;
-  bootOverlay.innerHTML = `<div class="ut-boot-card is-error"><b>ULTIMATE TEAM COULD NOT START</b><small>${String(error && error.message ? error.message : error)}</small><button type="button" data-boot-close>CLOSE</button></div>`;
+  const message = String(error && error.message ? error.message : error);
+  bootOverlay.innerHTML = `<div class="ut-boot-card is-error">
+    <b>ULTIMATE TEAM DATA UNAVAILABLE</b>
+    <small>${escapeHtml(message)}</small>
+    <small>This usually means the game was rebuilt with new chunk names. Retry after the page reloads.</small>
+    <div class="ut-boot-actions">
+      <button type="button" data-boot-retry>RETRY</button>
+      <button type="button" data-boot-close>CLOSE</button>
+    </div>
+  </div>`;
   bootOverlay.hidden = false;
   bootOverlay.querySelector('[data-boot-close]').addEventListener('click', hideBoot);
+  bootOverlay.querySelector('[data-boot-retry]').addEventListener('click', () => location.reload());
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 async function ensureInstance() {
@@ -63,6 +77,9 @@ async function ensureInstance() {
         import('./ui.js'),
       ]);
       const data = await loadGameData();
+      if (data.status === 'unavailable') {
+        throw new Error(data.reason || 'No player data could be found for Ultimate Team.');
+      }
       instance = mountUltimateTeam({ data });
       return instance;
     })().catch((error) => {

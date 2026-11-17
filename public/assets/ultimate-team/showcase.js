@@ -1,18 +1,19 @@
-// 3D hologram showcase for Ultimate Team.
-// Model + animation assets come from the three.js repository on GitHub
-// (Robot Expressive by Don McCurdy, CC-BY 4.0) and are served locally from
-// /assets/models. three.js itself is vendored from the same repository.
-const MODEL_URL = '/assets/models/robot-expressive.glb';
+// 3D player hologram for Ultimate Team.
+// Model, clips and three.js itself come from the three.js repository on GitHub
+// and are served locally: a rigged humanoid with Idle / Walk / Run clips,
+// quantised and WebP-textured to stay inside the Sites asset budget.
+const MODEL_URL = '/assets/models/player.glb';
 const THREE_URL = '/vendor/three.module.min.js';
 const LOADER_URL = '/vendor/GLTFLoader.js';
 
-const CLIP_BUTTONS = [
+// Preferred order and labels; only clips the model actually ships appear.
+const CLIP_ORDER = ['Idle', 'Walk', 'Run', 'Jog'];
+const CLIP_LABELS = { Idle: 'IDLE', Walk: 'WALK', Run: 'RUN', Jog: 'JOG' };
+const HIDDEN_CLIPS = new Set(['TPose', 'Tpose', 'TPose_', 'bindpose']);
+const FALLBACK_BUTTONS = [
   ['Idle', 'IDLE'],
-  ['Running', 'RUN'],
   ['Walk', 'WALK'],
-  ['Wave', 'WAVE'],
-  ['Dance', 'DANCE'],
-  ['ThumbsUp', 'THUMBS UP'],
+  ['Run', 'RUN'],
 ];
 
 export function createShowcase() {
@@ -29,13 +30,14 @@ export function createShowcase() {
   let clock = null;
   let frame = null;
   let current = null;
-  let clips = [];
+  let clipNames = [];
   const actions = {};
   let loadPromise = null;
   let failed = false;
   let dragX = 0;
   let dragging = false;
-  let spin = 0.35;
+  let spin = Math.PI;
+  const onClipsChanged = { fn: null };
 
   function onPointerDown(event) {
     dragging = true;
@@ -123,15 +125,16 @@ export function createShowcase() {
         scene.add(model);
 
         mixer = new THREE.AnimationMixer(model);
-        clips = gltf.animations || [];
+        const clips = gltf.animations || [];
+        clipNames = clips.map((clip) => clip.name).filter(Boolean);
         clips.forEach((clip) => {
-          const action = mixer.clipAction(clip);
-          actions[clip.name] = action;
+          actions[clip.name] = mixer.clipAction(clip);
         });
         clock = new THREE.Clock();
-        play('Idle');
+        play(preferredClip());
         resize();
         start();
+        if (typeof onClipsChanged.fn === 'function') onClipsChanged.fn(buttons());
       } catch (error) {
         failed = true;
         canvas.classList.add('is-unavailable');
@@ -144,9 +147,23 @@ export function createShowcase() {
     return loadPromise;
   }
 
+  function preferredClip() {
+    const usable = clipNames.filter((name) => !HIDDEN_CLIPS.has(name));
+    const preferred = CLIP_ORDER.find((name) => usable.includes(name));
+    return preferred || usable[0] || clipNames[0] || null;
+  }
+
+  function buttons() {
+    const usable = clipNames.filter((name) => !HIDDEN_CLIPS.has(name));
+    if (!usable.length) return FALLBACK_BUTTONS;
+    const preferred = CLIP_ORDER.filter((name) => usable.includes(name)).map((name) => [name, CLIP_LABELS[name] || name.toUpperCase()]);
+    if (preferred.length) return preferred;
+    return usable.map((name) => [name, CLIP_LABELS[name] || name.toUpperCase()]);
+  }
+
   function play(name) {
     if (!mixer) return;
-    const next = actions[name] || actions.Idle || Object.values(actions)[0];
+    const next = actions[name] || actions[preferredClip()] || Object.values(actions)[0];
     if (!next || next === current) return;
     next.reset().setEffectiveWeight(1).fadeIn(0.25).play();
     if (current) current.fadeOut(0.25);
@@ -168,7 +185,7 @@ export function createShowcase() {
     const delta = clock ? Math.min(clock.getDelta(), 0.05) : 0.016;
     if (mixer) mixer.update(delta);
     if (model) {
-      if (!dragging) spin += delta * 0.0001;
+      if (!dragging) spin += delta * 0.28;
       model.rotation.y = spin;
     }
     renderer.render(scene, camera);
@@ -197,9 +214,20 @@ export function createShowcase() {
     stop,
     play,
     get clips() {
-      return clips.map((clip) => clip.name);
+      return [...clipNames];
     },
-    buttons: CLIP_BUTTONS.filter(([clip]) => clip),
+    get buttons() {
+      return buttons();
+    },
+    get ready() {
+      return Boolean(renderer) && !failed;
+    },
+    get failed() {
+      return failed;
+    },
+    onClipsChanged(fn) {
+      onClipsChanged.fn = fn;
+    },
     dispose() {
       stop();
       observer.disconnect();

@@ -163,6 +163,22 @@ html.ut-open body {
   color: var(--dim, #91a79c);
 }
 
+.ut-warn {
+  margin-left: auto;
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 180, 0, 0.4);
+  background: rgba(255, 180, 0, 0.1);
+  color: var(--amber, #ffb400);
+  font: 700 8px/1 var(--ui, sans-serif);
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+}
+
+.ut-warn + .ut-coins {
+  margin-left: 0;
+}
+
 .ut-coins {
   display: flex;
   align-items: center;
@@ -1603,6 +1619,12 @@ html.ut-open body {
 
 .ut-boot-card.is-error b {
   color: #ff7d89;
+}
+
+.ut-boot-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .ut-boot-card button {

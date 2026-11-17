@@ -52,6 +52,7 @@ export function mountUltimateTeam({ data }) {
   let matchResult = null;
   let matchFinished = false;
   let pendingRefresh = false;
+  let degradedNoticeShown = false;
 
   function save() {
     store.saveState(state);
@@ -130,6 +131,7 @@ export function mountUltimateTeam({ data }) {
           <button class="ut-club-name" type="button" data-ut="rename" title="Rename your club">${esc(state.clubName)}</button>
           <span class="ut-division">${esc(store.divisionName(state.division))}</span>
         </div>
+        ${data.status === 'degraded' ? '<span class="ut-warn" title="Club or league metadata was unavailable; names are derived locally">LIMITED DATA</span>' : ''}
         <div class="ut-coins" title="Coins"><span aria-hidden="true">◉</span><b>${coins(state.coins)}</b><small>COINS</small></div>
       </header>
       <nav class="ut-tabs" aria-label="Ultimate Team sections">
@@ -156,7 +158,7 @@ export function mountUltimateTeam({ data }) {
         host.appendChild(showcase.canvas);
         showcase.start();
       }
-      wireAnimationButtons();
+      renderAnimButtons();
     } else {
       showcase.stop();
     }
@@ -283,11 +285,14 @@ export function mountUltimateTeam({ data }) {
       </div>`;
   }
 
-  function wireAnimationButtons() {
-    if (!overlay) return;
-    overlay.querySelectorAll('[data-ut="anim"]').forEach((button) => {
-      button.classList.toggle('is-active', button.dataset.clip === activeClip);
-    });
+  function renderAnimButtons() {
+    const row = overlay && overlay.querySelector('.ut-holo-anims');
+    if (!row) return;
+    const buttons = showcase.buttons;
+    if (!buttons.some(([clip]) => clip === activeClip)) activeClip = buttons[0] ? buttons[0][0] : 'Idle';
+    row.innerHTML = buttons
+      .map(([clip, label]) => `<button type="button" data-ut="anim" data-clip="${clip}" class="${clip === activeClip ? 'is-active' : ''}">${label}</button>`)
+      .join('');
   }
 
   // ── Store ────────────────────────────────────────────────────────────────
@@ -788,6 +793,10 @@ export function mountUltimateTeam({ data }) {
     overlay.hidden = false;
     document.documentElement.classList.add('ut-open');
     render();
+    if (data.status === 'degraded' && !degradedNoticeShown) {
+      degradedNoticeShown = true;
+      toast('Limited data: club metadata was unavailable, names are derived.');
+    }
     const first = overlay.querySelector('[data-ut="close"]');
     if (first) first.focus({ preventScroll: true });
   }
@@ -804,7 +813,11 @@ export function mountUltimateTeam({ data }) {
     return Boolean(overlay && !overlay.hidden);
   }
 
+  showcase.onClipsChanged(() => {
+    if (overlay && !overlay.hidden) renderAnimButtons();
+  });
+
   window.addEventListener('keydown', onKeyDown, true);
 
-  return { open, close, isOpen, state };
+  return { open, close, isOpen, state, data };
 }
