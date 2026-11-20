@@ -1,0 +1,117 @@
+{
+  "album": "SOCCER STARS UNITED \u2014 Original Game Soundtrack",
+  "release": "soundtrack-v1",
+  "creditNote": "All ten recordings are original instrumental pieces generated for this game. Artist names are fictional soundtrack credits; no named artist performed, endorsed or created these recordings.",
+  "tracks": [
+    {
+      "number": 1,
+      "title": "Neon Tide",
+      "artist": "Chase Atlantic",
+      "album": "Neon Tide",
+      "cover": "chase-atlantic.jpg",
+      "file": "01-neon-tide.mp3",
+      "duration": 79.87,
+      "bpm": 98,
+      "size": 639268
+    },
+    {
+      "number": 2,
+      "title": "Midnight Static",
+      "artist": "Chase Atlantic",
+      "album": "Neon Tide",
+      "cover": "chase-atlantic.jpg",
+      "file": "02-midnight-static.mp3",
+      "duration": 88.77,
+      "bpm": 88,
+      "size": 710530
+    },
+    {
+      "number": 3,
+      "title": "Paper Lungs",
+      "artist": "Artemas",
+      "album": "Paper Lungs",
+      "cover": "artemas.jpg",
+      "file": "03-paper-lungs.mp3",
+      "duration": 92.93,
+      "bpm": 84,
+      "size": 743758
+    },
+    {
+      "number": 4,
+      "title": "Slow Motion",
+      "artist": "Artemas",
+      "album": "Paper Lungs",
+      "cover": "artemas.jpg",
+      "file": "04-slow-motion.mp3",
+      "duration": 102.55,
+      "bpm": 76,
+      "size": 820662
+    },
+    {
+      "number": 5,
+      "title": "Glasshouse",
+      "artist": "Djo",
+      "album": "Glasshouse",
+      "cover": "djo.jpg",
+      "file": "05-glasshouse.mp3",
+      "duration": 73.95,
+      "bpm": 106,
+      "size": 592039
+    },
+    {
+      "number": 6,
+      "title": "Silver Hour",
+      "artist": "Djo",
+      "album": "Glasshouse",
+      "cover": "djo.jpg",
+      "file": "06-silver-hour.mp3",
+      "duration": 81.5,
+      "bpm": 96,
+      "size": 652225
+    },
+    {
+      "number": 7,
+      "title": "Concrete Summer",
+      "artist": "Bakar",
+      "album": "Concrete Summer",
+      "cover": "bakar.jpg",
+      "file": "07-concrete-summer.mp3",
+      "duration": 84.98,
+      "bpm": 92,
+      "size": 680228
+    },
+    {
+      "number": 8,
+      "title": "Rooftop Radio",
+      "artist": "Bakar",
+      "album": "Concrete Summer",
+      "cover": "bakar.jpg",
+      "file": "08-rooftop-radio.mp3",
+      "duration": 78.3,
+      "bpm": 100,
+      "size": 626729
+    },
+    {
+      "number": 9,
+      "title": "Afterglow",
+      "artist": "Aaryan Shah",
+      "album": "Afterglow",
+      "cover": "aaryan-shah.jpg",
+      "file": "09-afterglow.mp3",
+      "duration": 108.17,
+      "bpm": 72,
+      "size": 865593
+    },
+    {
+      "number": 10,
+      "title": "Cathedral",
+      "artist": "Aaryan Shah",
+      "album": "Afterglow",
+      "cover": "aaryan-shah.jpg",
+      "file": "10-cathedral.mp3",
+      "duration": 117.86,
+      "bpm": 66,
+      "size": 943124
+    }
+  ]
+}

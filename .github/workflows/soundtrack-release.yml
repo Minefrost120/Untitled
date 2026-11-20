@@ -1,0 +1,43 @@
+name: Publish soundtrack release
+
+# Creates (or updates) the soundtrack-v1 GitHub Release and uploads every audio
+# file and album cover as a release asset. The game streams those assets, so the
+# release download URLs are the canonical source for the soundtrack.
+on:
+  push:
+    branches: [soundtrack-hosting]
+    paths:
+      - 'soundtrack/**'
+      - '.github/workflows/soundtrack-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create or update the soundtrack release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: soundtrack-v1
+          name: SOCCER STARS UNITED — Original Game Soundtrack (Vol. 1)
+          fail_on_unmatched_files: true
+          body: |
+            Ten original instrumental pieces made for SOCCER STARS UNITED.
+
+            Two tracks per soundtrack credit: Chase Atlantic, Artemas, Djo, Bakar and Aaryan Shah.
+            These are fictional soundtrack credits: no named artist performed, endorsed or
+            created these recordings, and no licensed or sampled material is used.
+
+            Files:
+            - `01`–`10` MP3, 64 kbps mono, 44.1 kHz
+            - album covers (512×512 JPEG)
+            - `manifest.json` with titles, credits, durations and track numbers
+          files: |
+            soundtrack/*.mp3
+            soundtrack/covers/*.jpg
+            soundtrack/manifest.json
